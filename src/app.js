@@ -143,7 +143,7 @@ fillBtn.addEventListener('click', async () => {
 
 // API call to backend
 async function analyzeAndFill(imageDataUrl, profile) {
-  const response = await fetch('/api/analyze', {
+  const response = await fetch('api/analyze.php', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
