@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>ClickFiller</title>
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header id="header">
+      <h1>ClickFiller</h1>
+      <nav>
+        <button class="nav-btn active" data-view="capture">Capture</button>
+        <button class="nav-btn" data-view="profile">My Info</button>
+      </nav>
+    </header>
+
+    <!-- Capture View -->
+    <section id="capture-view" class="view active">
+      <div id="capture-prompt">
+        <div class="prompt-icon">&#128247;</div>
+        <h2>Capture a Form</h2>
+        <p class="subtitle">Take a photo or choose an existing image of the form you want to fill.</p>
+        <div id="capture-buttons">
+          <label class="btn btn-primary btn-large">
+            Take Photo
+            <input type="file" id="camera-input" accept="image/*" capture="environment" hidden>
+          </label>
+          <label class="btn btn-secondary btn-large">
+            Choose from Library
+            <input type="file" id="file-input" accept="image/*" hidden>
+          </label>
+        </div>
+      </div>
+      <div id="crop-container" style="display:none;">
+        <p class="crop-hint">Drag the 4 corners to match the edges of the form</p>
+        <div id="crop-wrapper"></div>
+        <div id="crop-controls">
+          <button id="crop-cancel-btn" class="btn btn-secondary">Retake</button>
+          <button id="crop-confirm-btn" class="btn btn-primary">Crop & Continue</button>
+        </div>
+      </div>
+      <div id="preview-container" style="display:none;">
+        <img id="preview-img" />
+        <div id="preview-controls">
+          <button id="retake-btn" class="btn btn-secondary">Retake</button>
+          <button id="fill-btn" class="btn btn-primary">Fill Form</button>
+        </div>
+      </div>
+      <div id="processing" style="display:none;">
+        <div class="spinner"></div>
+        <p>Analyzing form and filling fields...</p>
+      </div>
+    </section>
+
+    <!-- Result View -->
+    <section id="result-view" class="view">
+      <canvas id="result-canvas"></canvas>
+      <div id="result-controls">
+        <button id="download-btn" class="btn btn-primary">Download PDF</button>
+        <button id="new-form-btn" class="btn btn-secondary">New Form</button>
+      </div>
+    </section>
+
+    <!-- Profile View -->
+    <section id="profile-view" class="view">
+      <div id="profile-form">
+        <h2>Your Information</h2>
+        <p class="subtitle">This data is used to fill forms. Stored only on your device.</p>
+
+        <div class="field-group">
+          <h3>Personal</h3>
+          <label>First Name <input type="text" data-key="firstName"></label>
+          <label>Middle Name <input type="text" data-key="middleName"></label>
+          <label>Last Name <input type="text" data-key="lastName"></label>
+          <label>Date of Birth <input type="date" data-key="dateOfBirth"></label>
+          <label>Gender <input type="text" data-key="gender" placeholder="e.g. Male, Female, Non-binary"></label>
+          <label>SSN (last 4) <input type="text" data-key="ssn4" maxlength="4" placeholder="Optional"></label>
+        </div>
+
+        <div class="field-group">
+          <h3>Contact</h3>
+          <label>Email <input type="email" data-key="email"></label>
+          <label>Phone <input type="tel" data-key="phone"></label>
+        </div>
+
+        <div class="field-group">
+          <h3>Address</h3>
+          <label>Street Address <input type="text" data-key="streetAddress"></label>
+          <label>Apt/Unit <input type="text" data-key="aptUnit"></label>
+          <label>City <input type="text" data-key="city"></label>
+          <label>State <input type="text" data-key="state"></label>
+          <label>ZIP Code <input type="text" data-key="zipCode"></label>
+        </div>
+
+        <div class="field-group">
+          <h3>Employment</h3>
+          <label>Employer <input type="text" data-key="employer"></label>
+          <label>Job Title <input type="text" data-key="jobTitle"></label>
+          <label>Work Phone <input type="text" data-key="workPhone"></label>
+        </div>
+
+        <div class="field-group">
+          <h3>Insurance</h3>
+          <label>Insurance Provider <input type="text" data-key="insuranceProvider"></label>
+          <label>Policy Number <input type="text" data-key="policyNumber"></label>
+          <label>Group Number <input type="text" data-key="groupNumber"></label>
+        </div>
+
+        <div class="field-group">
+          <h3>Emergency Contact</h3>
+          <label>Name <input type="text" data-key="emergencyContactName"></label>
+          <label>Relationship <input type="text" data-key="emergencyContactRelation"></label>
+          <label>Phone <input type="tel" data-key="emergencyContactPhone"></label>
+        </div>
+
+        <div class="field-group">
+          <h3>Custom Fields</h3>
+          <div id="custom-fields"></div>
+          <button id="add-custom-field" class="btn btn-secondary">+ Add Field</button>
+        </div>
+
+        <button id="save-profile" class="btn btn-primary">Save Profile</button>
+      </div>
+    </section>
+  </div>
+
+  <script type="module" src="/src/app.js"></script>
+</body>
+</html>

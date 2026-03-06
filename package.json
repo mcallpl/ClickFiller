@@ -1,0 +1,29 @@
+{
+  "name": "clickfiller",
+  "version": "1.0.0",
+  "description": "Take a photo of a form, fill it automatically from your saved info, download as PDF",
+  "type": "module",
+  "scripts": {
+    "dev": "node server/index.js & vite --host",
+    "dev:server": "node server/index.js",
+    "dev:client": "vite --host",
+    "build": "vite build",
+    "start": "node server/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
+    "cors": "^2.8.6",
+    "cropperjs": "^1.6.2",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "jspdf": "^4.2.0",
+    "multer": "^2.1.1",
+    "vite": "^7.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-basic-ssl": "^2.1.4"
+  }
+}
