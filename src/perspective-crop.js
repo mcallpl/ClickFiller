@@ -26,17 +26,17 @@ export class PerspectiveCrop {
   }
 
   setupCanvas() {
-    const containerWidth = this.container.clientWidth;
-    const containerHeight = this.container.clientHeight || (window.innerHeight - 140);
+    // Use full screen minus space for hint text and buttons
+    const screenWidth = window.innerWidth - 24; // 12px padding each side
+    const screenHeight = window.innerHeight - 120; // room for hint + buttons
     const aspect = this.img.height / this.img.width;
 
-    // Fit image as large as possible within the container
-    let displayWidth = containerWidth;
-    let displayHeight = containerWidth * aspect;
+    let displayWidth = screenWidth;
+    let displayHeight = screenWidth * aspect;
 
-    if (displayHeight > containerHeight) {
-      displayHeight = containerHeight;
-      displayWidth = containerHeight / aspect;
+    if (displayHeight > screenHeight) {
+      displayHeight = screenHeight;
+      displayWidth = screenHeight / aspect;
     }
 
     const dpr = window.devicePixelRatio || 1;

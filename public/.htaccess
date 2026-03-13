@@ -1,0 +1,35 @@
+DirectoryIndex index.html
+
+# Force HTTPS
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{HTTPS} !=on
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    # Don't rewrite files or directories that exist
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+</IfModule>
+
+# Security headers
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+    Header set Strict-Transport-Security "max-age=31536000; includeSubDomains" env=HTTPS
+</IfModule>
+
+# Protect config file from direct access
+<Files "config.php">
+    Order Allow,Deny
+    Deny from all
+</Files>
+
+# Allow large POST bodies for image uploads
+<IfModule mod_php.c>
+    php_value post_max_size 20M
+    php_value upload_max_filesize 20M
+    php_value max_execution_time 120
+</IfModule>

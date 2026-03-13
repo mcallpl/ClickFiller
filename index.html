@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>ClickFiller</title>
@@ -34,6 +34,11 @@
             Choose from Library
             <input type="file" id="file-input" accept="image/*" hidden>
           </label>
+          <label class="btn btn-secondary btn-large">
+            Load Saved Form
+            <input type="file" id="saved-input" accept="image/*" hidden>
+          </label>
+          <button id="resume-btn" class="btn btn-secondary btn-large" style="display:none;">Resume Last Edit</button>
         </div>
       </div>
       <div id="crop-container" style="display:none;">
@@ -47,6 +52,7 @@
       <div id="preview-container" style="display:none;">
         <img id="preview-img" />
         <div id="preview-controls">
+          <button id="save-crop-btn" class="btn btn-secondary">Save Image</button>
           <button id="retake-btn" class="btn btn-secondary">Retake</button>
           <button id="fill-btn" class="btn btn-primary">Fill Form</button>
         </div>
@@ -59,10 +65,26 @@
 
     <!-- Result View -->
     <section id="result-view" class="view">
-      <canvas id="result-canvas"></canvas>
+      <p class="drag-hint">Tap and drag any text to reposition it</p>
+      <div id="result-form-container">
+        <img id="result-image" />
+      </div>
+      <canvas id="result-canvas" style="display:none;"></canvas>
       <div id="result-controls">
-        <button id="download-btn" class="btn btn-primary">Download PDF</button>
-        <button id="new-form-btn" class="btn btn-secondary">New Form</button>
+        <button id="add-text-btn" class="btn btn-secondary">+ Text</button>
+        <button id="add-sig-btn" class="btn btn-secondary">+ Signature</button>
+        <button id="save-positions-btn" class="btn btn-primary">Save</button>
+        <button id="download-btn" class="btn btn-primary">PDF</button>
+        <button id="new-form-btn" class="btn btn-secondary">New</button>
+      </div>
+      <!-- Signature picker modal -->
+      <div id="sig-picker" style="display:none;">
+        <div id="sig-picker-backdrop"></div>
+        <div id="sig-picker-content">
+          <h3>Choose a Signature</h3>
+          <div id="sig-picker-list"></div>
+          <button id="sig-picker-cancel" class="btn btn-secondary">Cancel</button>
+        </div>
       </div>
     </section>
 
@@ -116,6 +138,16 @@
           <label>Name <input type="text" data-key="emergencyContactName"></label>
           <label>Relationship <input type="text" data-key="emergencyContactRelation"></label>
           <label>Phone <input type="tel" data-key="emergencyContactPhone"></label>
+        </div>
+
+        <div class="field-group">
+          <h3>Signatures</h3>
+          <p class="field-hint">Upload signature images as PNG files (transparent background works best)</p>
+          <div id="signature-list"></div>
+          <label class="btn btn-secondary" style="margin-top:8px;">
+            + Add Signature
+            <input type="file" id="sig-upload" accept="image/*" hidden>
+          </label>
         </div>
 
         <div class="field-group">
