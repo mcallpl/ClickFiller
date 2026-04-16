@@ -1,4 +1,4 @@
-name: Build & Deploy to GoDaddy
+name: Deploy to DigitalOcean
 
 on:
   push:
@@ -25,19 +25,15 @@ jobs:
       - name: Copy API to dist
         run: cp -r api/ dist/api/
 
-      - name: Generate config.php from secret
-        run: |
-          cat > dist/api/config.php << 'PHPEOF'
-          <?php
-          $ANTHROPIC_API_KEY = '${{ secrets.ANTHROPIC_API_KEY }}';
-          PHPEOF
-
-      - name: Deploy to GoDaddy via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      - name: Deploy via rsync over SSH
+        uses: easingthemes/ssh-deploy@v5.1.0
         with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./dist/
-          server-dir: /public_html/ClickFiller/
-          dangerous-clean-slate: false
+          SSH_PRIVATE_KEY: ${{ secrets.DO_SSH_PRIVATE_KEY }}
+          REMOTE_HOST: 64.227.108.128
+          REMOTE_USER: root
+          SOURCE: dist/
+          TARGET: /var/www/html/ClickFiller/
+          EXCLUDE: >-
+            .git/,
+            .github/,
+            .DS_Store
