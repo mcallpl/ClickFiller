@@ -90,7 +90,7 @@ Return ONLY this JSON, nothing else:
 {\"fields\": [{\"label\": \"...\", \"x\": 0-100, \"y\": 0-100, \"width\": 0-100, \"height\": 0-100, \"value\": \"...\", \"fontSize\": 1.0-3.0}]}";
 
 $requestBody = [
-    'model' => 'claude-sonnet-4-20250514',
+    'model' => 'claude-haiku-4-5-20251001',
     'max_tokens' => 4096,
     'messages' => [
         [
