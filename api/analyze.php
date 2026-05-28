@@ -113,7 +113,7 @@ $requestBody = [
     ],
 ];
 
-$ch = curl_init('https://generativeai.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' . urlencode($vault_gemini_api_key));
+$ch = curl_init('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' . urlencode($vault_gemini_api_key));
 curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_POST => true,
