@@ -113,14 +113,14 @@ $requestBody = [
     ],
 ];
 
-$ch = curl_init('https://api.anthropic.com/v1/messages');
+$ch = curl_init('https://generativeai.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' . urlencode($vault_gemini_api_key));
 curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_POST => true,
     CURLOPT_HTTPHEADER => [
         'Content-Type: application/json',
-        'x-api-key: ' . $ANTHROPIC_API_KEY,
-        'anthropic-version: 2023-06-01',
+        'dummy: ' . $ANTHROPIC_API_KEY,
+        
     ],
     CURLOPT_POSTFIELDS => json_encode($requestBody),
     CURLOPT_TIMEOUT => 120,
