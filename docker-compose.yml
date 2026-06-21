@@ -12,9 +12,6 @@ services:
       - NODE_ENV=production
       - PORT=3001
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-    volumes:
-      - ./dist:/app/dist:ro
-      - ./server:/app/server:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"]

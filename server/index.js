@@ -1,8 +1,13 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
 import { analyzeForm } from './analyze.js';
 import { validateAnalyzeRequest } from './middleware/validation.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -10,15 +15,15 @@ const PORT = process.env.PORT || 3001;
 // Allow large payloads for images
 app.use(express.json({ limit: '20mb' }));
 
-// CORS middleware: Allow requests from dev and production origins
-// For production, update the origin array with your actual domain
+// CORS middleware
 app.use(cors({
   origin: [
-    'http://localhost:5173',    // Vite dev server (default)
-    'http://localhost:3001',    // Local API access
-    'http://127.0.0.1:5173',    // Alternative localhost
-    'http://127.0.0.1:3001',    // Alternative localhost
-    // 'https://yourdomain.com' will be added in production config
+    'http://localhost:5173',
+    'http://localhost:3001',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:3001',
+    'https://clickfiller.peoplestar.com',
+    'http://clickfiller.peoplestar.com',
   ],
   credentials: true,
   methods: ['GET', 'POST', 'OPTIONS'],
@@ -38,6 +43,27 @@ app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   next();
+});
+
+// Serve static files from dist folder
+const distPath = process.env.NODE_ENV === 'production'
+  ? '/app/dist'
+  : path.join(__dirname, '../dist');
+
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api') || req.path === '/health') {
+    return next();
+  }
+
+  const filePath = req.path === '/'
+    ? path.join(distPath, 'index.html')
+    : path.join(distPath, req.path);
+
+  res.sendFile(filePath, (err) => {
+    if (err && err.code === 'ENOENT') {
+      res.sendFile(path.join(distPath, 'index.html'));
+    }
+  });
 });
 
 // Health check endpoint (for monitoring/deployment verification)
