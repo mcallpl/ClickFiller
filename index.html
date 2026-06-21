@@ -5,40 +5,42 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>ClickFiller</title>
+  <title>ClickFiller - Auto-Fill Forms from Photos</title>
   <link rel="stylesheet" href="/src/style.css">
 </head>
 <body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
   <div id="app">
     <!-- Header -->
-    <header id="header">
+    <header id="header" role="banner">
       <h1>ClickFiller</h1>
-      <nav>
-        <button class="nav-btn active" data-view="capture">Capture</button>
+      <nav aria-label="Main navigation">
+        <button class="nav-btn active" data-view="capture" aria-current="page">Capture</button>
         <button class="nav-btn" data-view="profile">My Info</button>
       </nav>
     </header>
 
     <!-- Capture View -->
-    <section id="capture-view" class="view active">
+    <main id="main-content">
+    <section id="capture-view" class="view active" aria-label="Form capture view">
       <div id="capture-prompt">
         <div class="prompt-icon">&#128247;</div>
         <h2>Capture a Form</h2>
         <p class="subtitle">Take a photo or choose an existing image of the form you want to fill.</p>
         <div id="capture-buttons">
-          <label class="btn btn-primary btn-large">
+          <label class="btn btn-primary btn-large" aria-label="Take photo with device camera">
             Take Photo
-            <input type="file" id="camera-input" accept="image/*" capture="environment" hidden>
+            <input type="file" id="camera-input" accept="image/*" capture="environment" hidden aria-label="Select image from camera">
           </label>
-          <label class="btn btn-secondary btn-large">
+          <label class="btn btn-secondary btn-large" aria-label="Choose image from device library">
             Choose from Library
-            <input type="file" id="file-input" accept="image/*" hidden>
+            <input type="file" id="file-input" accept="image/*" hidden aria-label="Select image file">
           </label>
-          <label class="btn btn-secondary btn-large">
+          <label class="btn btn-secondary btn-large" aria-label="Load previously saved and cropped form">
             Load Saved Form
-            <input type="file" id="saved-input" accept="image/*" hidden>
+            <input type="file" id="saved-input" accept="image/*" hidden aria-label="Select saved form image">
           </label>
-          <button id="resume-btn" class="btn btn-secondary btn-large" style="display:none;">Resume Last Edit</button>
+          <button id="resume-btn" class="btn btn-secondary btn-large" style="display:none;" aria-label="Resume editing previous form">Resume Last Edit</button>
         </div>
       </div>
       <div id="crop-container" style="display:none;">
@@ -52,9 +54,9 @@
       <div id="preview-container" style="display:none;">
         <img id="preview-img" />
         <div id="preview-controls">
-          <button id="save-crop-btn" class="btn btn-secondary">Save Image</button>
-          <button id="retake-btn" class="btn btn-secondary">Retake</button>
-          <button id="fill-btn" class="btn btn-primary">Fill Form</button>
+          <button id="save-crop-btn" class="btn btn-secondary" aria-label="Save cropped image to device">Save Image</button>
+          <button id="retake-btn" class="btn btn-secondary" aria-label="Take or select a different image">Retake</button>
+          <button id="fill-btn" class="btn btn-primary" aria-label="Analyze form and auto-fill fields">Fill Form</button>
         </div>
       </div>
       <div id="processing" style="display:none;">
@@ -64,18 +66,18 @@
     </section>
 
     <!-- Result View -->
-    <section id="result-view" class="view">
+    <section id="result-view" class="view" aria-label="Form result and editing view">
       <p class="drag-hint">Tap and drag any text to reposition it</p>
       <div id="result-form-container">
         <img id="result-image" />
       </div>
       <canvas id="result-canvas" style="display:none;"></canvas>
       <div id="result-controls">
-        <button id="add-text-btn" class="btn btn-secondary">+ Text</button>
-        <button id="add-sig-btn" class="btn btn-secondary">+ Signature</button>
-        <button id="save-positions-btn" class="btn btn-primary">Save</button>
-        <button id="download-btn" class="btn btn-primary">PDF</button>
-        <button id="new-form-btn" class="btn btn-secondary">New</button>
+        <button id="add-text-btn" class="btn btn-secondary" aria-label="Add text field to form">+ Text</button>
+        <button id="add-sig-btn" class="btn btn-secondary" aria-label="Add signature to form">+ Signature</button>
+        <button id="save-positions-btn" class="btn btn-primary" aria-label="Save current field positions">Save</button>
+        <button id="download-btn" class="btn btn-primary" aria-label="Download filled form as PDF">PDF</button>
+        <button id="new-form-btn" class="btn btn-secondary" aria-label="Start with a new form">New</button>
       </div>
       <!-- Signature picker modal -->
       <div id="sig-picker" style="display:none;">
@@ -89,76 +91,78 @@
     </section>
 
     <!-- Profile View -->
-    <section id="profile-view" class="view">
-      <div id="profile-form">
+    <section id="profile-view" class="view" aria-label="Profile and personal information">
+      <form id="profile-form">
         <h2>Your Information</h2>
         <p class="subtitle">This data is used to fill forms. Stored only on your device.</p>
 
         <div class="field-group">
           <h3>Personal</h3>
-          <label>First Name <input type="text" data-key="firstName"></label>
-          <label>Middle Name <input type="text" data-key="middleName"></label>
-          <label>Last Name <input type="text" data-key="lastName"></label>
-          <label>Date of Birth <input type="date" data-key="dateOfBirth"></label>
-          <label>Gender <input type="text" data-key="gender" placeholder="e.g. Male, Female, Non-binary"></label>
-          <label>SSN (last 4) <input type="text" data-key="ssn4" maxlength="4" placeholder="Optional"></label>
+          <label for="firstName">First Name <input type="text" id="firstName" data-key="firstName"></label>
+          <label for="middleName">Middle Name <input type="text" id="middleName" data-key="middleName"></label>
+          <label for="lastName">Last Name <input type="text" id="lastName" data-key="lastName"></label>
+          <label for="dateOfBirth">Date of Birth <input type="date" id="dateOfBirth" data-key="dateOfBirth"></label>
+          <label for="gender">Gender <input type="text" id="gender" data-key="gender" placeholder="e.g. Male, Female, Non-binary"></label>
+          <label for="ssn4">SSN (last 4) <input type="text" id="ssn4" data-key="ssn4" maxlength="4" placeholder="Optional"></label>
         </div>
 
         <div class="field-group">
           <h3>Contact</h3>
-          <label>Email <input type="email" data-key="email"></label>
-          <label>Phone <input type="tel" data-key="phone"></label>
+          <label for="email">Email <input type="email" id="email" data-key="email"></label>
+          <label for="phone">Phone <input type="tel" id="phone" data-key="phone"></label>
         </div>
 
         <div class="field-group">
           <h3>Address</h3>
-          <label>Street Address <input type="text" data-key="streetAddress"></label>
-          <label>Apt/Unit <input type="text" data-key="aptUnit"></label>
-          <label>City <input type="text" data-key="city"></label>
-          <label>State <input type="text" data-key="state"></label>
-          <label>ZIP Code <input type="text" data-key="zipCode"></label>
+          <label for="streetAddress">Street Address <input type="text" id="streetAddress" data-key="streetAddress"></label>
+          <label for="aptUnit">Apt/Unit <input type="text" id="aptUnit" data-key="aptUnit"></label>
+          <label for="city">City <input type="text" id="city" data-key="city"></label>
+          <label for="state">State <input type="text" id="state" data-key="state"></label>
+          <label for="zipCode">ZIP Code <input type="text" id="zipCode" data-key="zipCode"></label>
         </div>
 
         <div class="field-group">
           <h3>Employment</h3>
-          <label>Employer <input type="text" data-key="employer"></label>
-          <label>Job Title <input type="text" data-key="jobTitle"></label>
-          <label>Work Phone <input type="text" data-key="workPhone"></label>
+          <label for="employer">Employer <input type="text" id="employer" data-key="employer"></label>
+          <label for="jobTitle">Job Title <input type="text" id="jobTitle" data-key="jobTitle"></label>
+          <label for="workPhone">Work Phone <input type="text" id="workPhone" data-key="workPhone"></label>
         </div>
 
         <div class="field-group">
           <h3>Insurance</h3>
-          <label>Insurance Provider <input type="text" data-key="insuranceProvider"></label>
-          <label>Policy Number <input type="text" data-key="policyNumber"></label>
-          <label>Group Number <input type="text" data-key="groupNumber"></label>
+          <label for="insuranceProvider">Insurance Provider <input type="text" id="insuranceProvider" data-key="insuranceProvider"></label>
+          <label for="policyNumber">Policy Number <input type="text" id="policyNumber" data-key="policyNumber"></label>
+          <label for="groupNumber">Group Number <input type="text" id="groupNumber" data-key="groupNumber"></label>
         </div>
 
         <div class="field-group">
           <h3>Emergency Contact</h3>
-          <label>Name <input type="text" data-key="emergencyContactName"></label>
-          <label>Relationship <input type="text" data-key="emergencyContactRelation"></label>
-          <label>Phone <input type="tel" data-key="emergencyContactPhone"></label>
+          <label for="emergencyContactName">Name <input type="text" id="emergencyContactName" data-key="emergencyContactName"></label>
+          <label for="emergencyContactRelation">Relationship <input type="text" id="emergencyContactRelation" data-key="emergencyContactRelation"></label>
+          <label for="emergencyContactPhone">Phone <input type="tel" id="emergencyContactPhone" data-key="emergencyContactPhone"></label>
         </div>
 
         <div class="field-group">
           <h3>Signatures</h3>
           <p class="field-hint">Upload signature images as PNG files (transparent background works best)</p>
-          <div id="signature-list"></div>
-          <label class="btn btn-secondary" style="margin-top:8px;">
+          <div id="signature-list" role="list"></div>
+          <label class="btn btn-secondary" style="margin-top:8px;" aria-label="Upload signature image file">
             + Add Signature
-            <input type="file" id="sig-upload" accept="image/*" hidden>
+            <input type="file" id="sig-upload" accept="image/*" hidden aria-label="Select signature image">
           </label>
         </div>
 
         <div class="field-group">
           <h3>Custom Fields</h3>
           <div id="custom-fields"></div>
-          <button id="add-custom-field" class="btn btn-secondary">+ Add Field</button>
+          <button type="button" id="add-custom-field" class="btn btn-secondary" aria-label="Add custom field">+ Add Field</button>
         </div>
 
-        <button id="save-profile" class="btn btn-primary">Save Profile</button>
-      </div>
+        <button type="button" id="save-profile" class="btn btn-primary" aria-label="Save all profile information">Save Profile</button>
+        <button type="button" id="clear-all-data" class="btn btn-danger" style="background-color: #d32f2f; margin-top: 20px;" aria-label="Permanently delete all saved information">Clear All Data</button>
+      </form>
     </section>
+    </main>
   </div>
 
   <script type="module" src="/src/app.js"></script>

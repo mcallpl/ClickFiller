@@ -1,3 +1,5 @@
+import { eventBus } from './event-bus.js';
+
 const SIG_KEY = 'clickfiller_signatures';
 
 /**
@@ -95,7 +97,18 @@ export function pickSignature() {
   return new Promise((resolve) => {
     const sigs = getSignatures();
     if (sigs.length === 0) {
-      alert('No signatures saved. Go to My Info to add one.');
+      // Use eventBus to emit error event - will be handled by error handler module
+      eventBus.emit('error:occurred', {
+        message: 'Add at least one signature in your profile before you can place one on the form.',
+        title: 'No Signatures Available',
+        userFacing: true,
+        action: {
+          label: 'Go to My Info',
+          callback: () => {
+            eventBus.emit('navigation:go-to-view', { view: 'profile' });
+          },
+        },
+      });
       resolve(null);
       return;
     }
