@@ -1,0 +1,53 @@
+# Prometheus Configuration for ClickFiller Monitoring
+#
+# Deploy this configuration when you're ready to add advanced monitoring
+# Prometheus will scrape metrics from the health endpoint and system metrics
+#
+# Usage:
+#   docker pull prom/prometheus
+#   docker run -v $(pwd)/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml \
+#     -p 9090:9090 prom/prometheus
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'clickfiller-monitor'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Load rules once and periodically evaluate them
+rule_files:
+  - "alert.rules.yml"
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # ClickFiller API Health
+  - job_name: 'clickfiller-api'
+    metrics_path: '/health'
+    static_configs:
+      - targets: ['app:3001']
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+  # Node Exporter (if installed for system metrics)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['localhost:9100']
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+  # Docker metrics (if using docker-exporter)
+  - job_name: 'docker'
+    static_configs:
+      - targets: ['localhost:9323']
+    scrape_interval: 30s
+    scrape_timeout: 10s

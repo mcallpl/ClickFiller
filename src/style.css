@@ -59,9 +59,18 @@ nav {
   transition: all 0.2s;
 }
 
+.nav-btn:hover:not(.active) {
+  background: var(--surface-light);
+  color: var(--text);
+}
+
 .nav-btn.active {
   background: var(--primary);
   color: white;
+}
+
+.nav-btn.active:hover {
+  background: var(--primary-dark);
 }
 
 /* Buttons */
@@ -92,6 +101,22 @@ nav {
 .btn-secondary {
   background: var(--surface-light);
   color: var(--text);
+}
+
+.btn-danger {
+  background: #ef4444;
+  color: white;
+  margin-top: 20px;
+  width: 100%;
+}
+
+.btn-danger:hover {
+  background: #dc2626;
+}
+
+.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Capture Prompt */
@@ -403,6 +428,10 @@ nav {
 
 #add-custom-field {
   width: 100%;
+  margin-top: 8px;
+}
+
+.btn-signature-upload {
   margin-top: 8px;
 }
 
@@ -940,4 +969,9 @@ button:disabled {
 
 .skip-link:focus {
   top: 0;
+}
+
+/* Utility classes for display management */
+.hidden {
+  display: none;
 }

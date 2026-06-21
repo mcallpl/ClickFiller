@@ -1,0 +1,246 @@
+/**
+ * Profile data validation module
+ * Validates all profile fields before saving
+ */
+
+const VALIDATORS = {
+  firstName: {
+    validate: (value) => {
+      if (!value) return true; // optional
+      if (value.length > 50) return false;
+      // Allow letters, hyphens, apostrophes
+      return /^[a-zA-Z\-']+$/.test(value);
+    },
+    message: 'First name must be max 50 characters, letters/hyphens/apostrophes only',
+  },
+  middleName: {
+    validate: (value) => {
+      if (!value) return true; // optional
+      if (value.length > 50) return false;
+      return /^[a-zA-Z\-']+$/.test(value);
+    },
+    message: 'Middle name must be max 50 characters, letters/hyphens/apostrophes only',
+  },
+  lastName: {
+    validate: (value) => {
+      if (!value) return true; // optional
+      if (value.length > 50) return false;
+      return /^[a-zA-Z\-']+$/.test(value);
+    },
+    message: 'Last name must be max 50 characters, letters/hyphens/apostrophes only',
+  },
+  email: {
+    validate: (value) => {
+      if (!value) return true; // optional
+      // RFC 5322 simplified regex
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return emailRegex.test(value) && value.length <= 100;
+    },
+    message: 'Email must be a valid email address',
+  },
+  phone: {
+    validate: (value) => {
+      if (!value) return true; // optional
+      // Digits and dashes only, 10-15 characters
+      const phoneRegex = /^[\d\-\+\(\) ]{10,15}$/;
+      return phoneRegex.test(value);
+    },
+    message: 'Phone must be 10-15 characters, digits and dashes only',
+  },
+  workPhone: {
+    validate: (value) => {
+      if (!value) return true; // optional
+      const phoneRegex = /^[\d\-\+\(\) ]{10,15}$/;
+      return phoneRegex.test(value);
+    },
+    message: 'Work phone must be 10-15 characters, digits and dashes only',
+  },
+  emergencyContactPhone: {
+    validate: (value) => {
+      if (!value) return true; // optional
+      const phoneRegex = /^[\d\-\+\(\) ]{10,15}$/;
+      return phoneRegex.test(value);
+    },
+    message: 'Emergency contact phone must be 10-15 characters, digits and dashes only',
+  },
+  ssn4: {
+    validate: (value) => {
+      if (!value) return true; // optional
+      return /^\d{4}$/.test(value);
+    },
+    message: 'SSN (last 4) must be exactly 4 digits',
+  },
+  dateOfBirth: {
+    validate: (value) => {
+      if (!value) return true; // optional
+      // Check if valid ISO date format
+      const date = new Date(value);
+      if (isNaN(date.getTime())) return false;
+      // Check it's not a future date
+      if (date > new Date()) return false;
+      return true;
+    },
+    message: 'Date of birth must be a valid date in the past',
+  },
+  zipCode: {
+    validate: (value) => {
+      if (!value) return true; // optional
+      // US zip code: 5 or 9 digits (with or without hyphen)
+      return /^\d{5}(-\d{4})?$/.test(value);
+    },
+    message: 'ZIP code must be 5 or 9 digits (e.g., 12345 or 12345-6789)',
+  },
+  gender: {
+    validate: (value) => {
+      if (!value) return true; // optional
+      return value.length <= 50;
+    },
+    message: 'Gender must be max 50 characters',
+  },
+  streetAddress: {
+    validate: (value) => {
+      if (!value) return true; // optional
+      return value.length <= 100;
+    },
+    message: 'Street address must be max 100 characters',
+  },
+  aptUnit: {
+    validate: (value) => {
+      if (!value) return true; // optional
+      return value.length <= 50;
+    },
+    message: 'Apt/Unit must be max 50 characters',
+  },
+  city: {
+    validate: (value) => {
+      if (!value) return true; // optional
+      return value.length <= 50 && /^[a-zA-Z\s\-']+$/.test(value);
+    },
+    message: 'City must be max 50 characters, letters and spaces/hyphens/apostrophes only',
+  },
+  state: {
+    validate: (value) => {
+      if (!value) return true; // optional
+      return value.length <= 50 && /^[a-zA-Z\s\-']+$/.test(value);
+    },
+    message: 'State must be max 50 characters, letters and spaces/hyphens/apostrophes only',
+  },
+  employer: {
+    validate: (value) => {
+      if (!value) return true; // optional
+      return value.length <= 100;
+    },
+    message: 'Employer must be max 100 characters',
+  },
+  jobTitle: {
+    validate: (value) => {
+      if (!value) return true; // optional
+      return value.length <= 100;
+    },
+    message: 'Job title must be max 100 characters',
+  },
+  insuranceProvider: {
+    validate: (value) => {
+      if (!value) return true; // optional
+      return value.length <= 100;
+    },
+    message: 'Insurance provider must be max 100 characters',
+  },
+  policyNumber: {
+    validate: (value) => {
+      if (!value) return true; // optional
+      return value.length <= 50;
+    },
+    message: 'Policy number must be max 50 characters',
+  },
+  groupNumber: {
+    validate: (value) => {
+      if (!value) return true; // optional
+      return value.length <= 50;
+    },
+    message: 'Group number must be max 50 characters',
+  },
+  emergencyContactName: {
+    validate: (value) => {
+      if (!value) return true; // optional
+      return value.length <= 50 && /^[a-zA-Z\s\-']+$/.test(value);
+    },
+    message: 'Emergency contact name must be max 50 characters, letters and spaces/hyphens/apostrophes only',
+  },
+  emergencyContactRelation: {
+    validate: (value) => {
+      if (!value) return true; // optional
+      return value.length <= 50;
+    },
+    message: 'Emergency contact relationship must be max 50 characters',
+  },
+};
+
+/**
+ * Validate a complete profile object
+ * @param {Object} data - Profile data to validate
+ * @returns {Object} { valid: boolean, errors: Object<fieldName, errorMessage> }
+ */
+export function validateProfile(data) {
+  const errors = {};
+
+  // Validate each known field
+  Object.entries(data).forEach(([key, value]) => {
+    if (key === '_custom') return; // Skip custom fields array
+
+    if (VALIDATORS[key]) {
+      if (!VALIDATORS[key].validate(value)) {
+        errors[key] = VALIDATORS[key].message;
+      }
+    }
+  });
+
+  // Validate custom fields if present
+  if (data._custom && Array.isArray(data._custom)) {
+    data._custom.forEach((field, idx) => {
+      if (!field.label || !field.value) return;
+
+      // Custom field label: max 50 chars, letters/numbers/spaces/hyphens
+      if (field.label.length > 50 || !/^[a-zA-Z0-9\s\-]+$/.test(field.label)) {
+        errors[`_custom_label_${idx}`] = 'Custom field name must be max 50 characters, letters/numbers/spaces/hyphens only';
+      }
+
+      // Custom field value: max 100 chars
+      if (field.value.length > 100) {
+        errors[`_custom_value_${idx}`] = 'Custom field value must be max 100 characters';
+      }
+    });
+  }
+
+  return {
+    valid: Object.keys(errors).length === 0,
+    errors,
+  };
+}
+
+/**
+ * Get validation error message for a field (if any)
+ * @param {string} fieldName - Name of the field
+ * @param {any} value - Value to validate
+ * @returns {string|null} Error message or null if valid
+ */
+export function getFieldError(fieldName, value) {
+  if (!VALIDATORS[fieldName]) return null;
+  if (!VALIDATORS[fieldName].validate(value)) {
+    return VALIDATORS[fieldName].message;
+  }
+  return null;
+}
+
+/**
+ * Sanitize a custom field value (remove suspicious characters)
+ * @param {string} value - Value to sanitize
+ * @returns {string} Sanitized value
+ */
+export function sanitizeCustomValue(value) {
+  // Remove anything that looks like a script or HTML tag
+  return value
+    .replace(/<[^>]*>/g, '') // Remove HTML tags
+    .replace(/javascript:/gi, '') // Remove javascript: protocol
+    .trim();
+}

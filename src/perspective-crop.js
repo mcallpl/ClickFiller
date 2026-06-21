@@ -39,7 +39,9 @@ export class PerspectiveCrop {
       displayWidth = screenHeight / aspect;
     }
 
-    const dpr = window.devicePixelRatio || 1;
+    // Use standard DPI (96) for canvas rendering instead of forcing max resolution
+    // This reduces memory usage while maintaining visual quality
+    const dpr = Math.min(window.devicePixelRatio || 1, 2); // Cap at 2x for reasonable memory
     this.canvas.width = displayWidth * dpr;
     this.canvas.height = displayHeight * dpr;
     this.canvas.style.width = displayWidth + 'px';

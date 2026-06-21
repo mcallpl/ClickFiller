@@ -1,23 +1,10 @@
-const STORAGE_KEY = 'clickfiller_profile';
-const COOKIE_KEY = 'clickfiller_profile_backup';
+import { StorageManager } from './storage-manager.js';
 
 export function loadProfile() {
-  let saved = localStorage.getItem(STORAGE_KEY);
-
-  // If localStorage is empty, try recovering from cookie backup
-  if (!saved) {
-    saved = getCookie(COOKIE_KEY);
-    if (saved) {
-      // Restore to localStorage
-      localStorage.setItem(STORAGE_KEY, saved);
-    }
-  }
-
-  if (!saved) return;
+  const data = StorageManager.loadProfile();
+  if (!data) return;
 
   try {
-    const data = JSON.parse(saved);
-
     // Fill standard fields
     document.querySelectorAll('#profile-form input[data-key]').forEach(input => {
       if (data[input.dataset.key] !== undefined) {
@@ -38,13 +25,30 @@ export function loadProfile() {
 
 export function saveProfile() {
   const data = gatherProfileData();
-  const json = JSON.stringify(data);
+  const result = StorageManager.saveProfile(data);
 
-  // Save to localStorage
-  localStorage.setItem(STORAGE_KEY, json);
+  if (!result.success) {
+    console.error('Profile save failed:', result.error);
+    // Show user-facing error
+    if (result.error.includes('too large')) {
+      showProfileError(result.error + ' Please remove signatures or custom fields.');
+    } else if (result.error.includes('Validation failed')) {
+      showProfileError('Some profile fields have invalid values. Please check and correct them.');
+    } else {
+      showProfileError('Failed to save profile: ' + result.error);
+    }
+    return false;
+  }
 
-  // Backup to cookie (expires in 5 years)
-  setCookie(COOKIE_KEY, json, 365 * 5);
+  // Check for quota warning
+  const usage = StorageManager.getStorageUsage();
+  if (usage.percentFull > 85) {
+    const suggestions = StorageManager.getCleanupSuggestions();
+    const msg = `Your profile is ${Math.round(usage.percentFull)}% full. ` + suggestions.join(' ');
+    showProfileWarning(msg);
+  }
+
+  return true;
 }
 
 export function getProfile() {
@@ -58,18 +62,7 @@ export function getProfile() {
   }
 
   // Fall back to stored data
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if (saved) {
-    try { return JSON.parse(saved); } catch { /* fall through */ }
-  }
-
-  // Last resort: cookie
-  const cookie = getCookie(COOKIE_KEY);
-  if (cookie) {
-    try { return JSON.parse(cookie); } catch { /* fall through */ }
-  }
-
-  return null;
+  return StorageManager.loadProfile();
 }
 
 function gatherProfileData() {
@@ -127,27 +120,111 @@ export function setupAutoSave() {
   });
 }
 
-// Cookie helpers
-function setCookie(name, value, days) {
-  try {
-    const expires = new Date(Date.now() + days * 864e5).toUTCString();
-    // Cookies have a ~4KB limit, so compress if needed
-    let val = value;
-    if (val.length > 3800) {
-      // Too big for a cookie — just save what we can in localStorage
-      return;
-    }
-    document.cookie = name + '=' + encodeURIComponent(val) + '; expires=' + expires + '; path=/; SameSite=Lax';
-  } catch (e) {
-    console.warn('Cookie save failed:', e);
-  }
+/**
+ * Show error message to user
+ */
+function showProfileError(message) {
+  // Create and display error notification
+  const errorEl = document.createElement('div');
+  errorEl.className = 'profile-error-message';
+  errorEl.textContent = message;
+  errorEl.style.cssText = `
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #d32f2f;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 4px;
+    z-index: 1000;
+    font-size: 14px;
+    max-width: 80%;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  `;
+  document.body.appendChild(errorEl);
+  console.error('Profile error:', message);
+
+  setTimeout(() => errorEl.remove(), 5000);
 }
 
-function getCookie(name) {
+/**
+ * Show warning message to user
+ */
+function showProfileWarning(message) {
+  const warningEl = document.createElement('div');
+  warningEl.className = 'profile-warning-message';
+  warningEl.textContent = message;
+  warningEl.style.cssText = `
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #ff9800;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 4px;
+    z-index: 1000;
+    font-size: 14px;
+    max-width: 80%;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  `;
+  document.body.appendChild(warningEl);
+  console.warn('Profile warning:', message);
+
+  setTimeout(() => warningEl.remove(), 6000);
+}
+
+/**
+ * Clear all user data (GDPR right to deletion)
+ * Removes: profile data, saved results, signatures, images
+ */
+export function clearAllData() {
+  // Confirm with user
+  const confirmed = window.confirm(
+    'This will permanently delete all your saved data (profile, signatures, forms). This action cannot be undone. Continue?'
+  );
+  if (!confirmed) return false;
+
   try {
-    const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-    return match ? decodeURIComponent(match[2]) : null;
-  } catch {
-    return null;
+    // Clear profile from localStorage
+    StorageManager.clearProfile();
+
+    // Clear any saved result image
+    localStorage.removeItem('clickfiller_saved_result');
+
+    // Clear any captured image from session
+    const previewImg = document.getElementById('preview-img');
+    if (previewImg) {
+      previewImg.src = '';
+    }
+
+    // Clear any canvas
+    const resultCanvas = document.getElementById('result-canvas');
+    if (resultCanvas) {
+      const ctx = resultCanvas.getContext('2d');
+      ctx?.clearRect(0, 0, resultCanvas.width, resultCanvas.height);
+    }
+
+    // Clear all form inputs
+    document.querySelectorAll('#profile-form input[data-key]').forEach(input => {
+      input.value = '';
+    });
+
+    // Clear custom fields
+    const customFields = document.getElementById('custom-fields');
+    if (customFields) {
+      customFields.innerHTML = '';
+    }
+
+    // Clear signatures (stored in localStorage as 'clickfiller_signatures')
+    localStorage.removeItem('clickfiller_signatures');
+
+    showProfileWarning('All your data has been deleted. You can now close this browser.');
+    return true;
+  } catch (e) {
+    console.error('Error clearing data:', e);
+    showProfileError('Failed to clear all data: ' + e.message);
+    return false;
   }
 }

@@ -3,37 +3,53 @@ import Anthropic from '@anthropic-ai/sdk';
 const client = new Anthropic();
 
 export async function analyzeForm(imageDataUrl, profile) {
+  console.log('[analyzeForm] IMAGE RECEIVED');
+
   const base64Match = imageDataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
   if (!base64Match) {
+    console.error('[analyzeForm] Invalid image data format');
     throw new Error('Invalid image data');
   }
 
   const mediaType = base64Match[1];
   const base64Data = base64Match[2];
+  console.log(`[analyzeForm] Media type: ${mediaType}, size: ${base64Data.length} bytes`);
 
+  // Sanitize profile data before sending to Claude
+  // This prevents prompt injection attacks via user-supplied values
   const profileSummary = Object.entries(profile)
     .filter(([key]) => key !== '_custom')
-    .map(([key, value]) => `${key}: ${value}`)
+    .map(([key, value]) => {
+      // Remove newlines, tabs, and other control characters that could break prompt injection
+      const clean = String(value)
+        .replace(/[\r\n\t]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .substring(0, 200); // Max 200 chars per field for safety
+      return `${key}: ${clean}`;
+    })
     .join('\n');
 
-  const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 4096,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            source: {
-              type: 'base64',
-              media_type: mediaType,
-              data: base64Data,
+  try {
+    console.log('[analyzeForm] CALLING CLAUDE API');
+    const response = await client.messages.create({
+      model: 'claude-opus-4-8',
+      max_tokens: 4096,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: mediaType,
+                data: base64Data,
+              },
             },
-          },
-          {
-            type: 'text',
-            text: `You are an expert form-filling assistant. Look at this form image very carefully.
+            {
+              type: 'text',
+              text: `You are an expert form-filling assistant. Look at this form image very carefully.
 
 STEP 1: Study the form's layout. Note where each label is and where the corresponding blank/line/box is where someone would write. Pay attention to the SIZE of the printed text on the form — your filled text should match that size.
 
@@ -70,18 +86,44 @@ Return JSON:
 - fontSize is a percentage of image height
 - Only include fields with matching user data
 - Return ONLY valid JSON, nothing else`,
-          },
-        ],
-      },
-    ],
-  });
+            },
+          ],
+        },
+      ],
+    });
 
-  const text = response.content[0].text;
+    console.log('[analyzeForm] RESPONSE RECEIVED from Claude');
+    const text = response.content[0].text;
 
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    throw new Error('Failed to parse AI response');
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.error('[analyzeForm] Failed to parse AI response - no JSON found');
+      throw new Error('Failed to parse AI response');
+    }
+
+    console.log('[analyzeForm] RESPONSE PARSED successfully');
+    const result = JSON.parse(jsonMatch[0]);
+    console.log(`[analyzeForm] Analysis complete: ${result.fields?.length || 0} fields identified`);
+    return result;
+  } catch (err) {
+    if (err.status === 408 || err.code === 'ETIMEDOUT') {
+      console.error('[analyzeForm] TIMEOUT: Form analysis took too long');
+      const timeoutError = new Error('Form analysis timed out. Please try with a simpler form or clearer image.');
+      timeoutError.statusCode = 408;
+      throw timeoutError;
+    } else if (err instanceof SyntaxError) {
+      console.error('[analyzeForm] PARSE ERROR: Invalid JSON response from AI');
+      const parseError = new Error('Invalid response from AI - could not parse form analysis.');
+      parseError.statusCode = 400;
+      throw parseError;
+    } else if (err.status && err.status >= 400) {
+      console.error(`[analyzeForm] API ERROR: ${err.status} - ${err.message}`);
+      const apiError = new Error(`Anthropic API error: ${err.message}`);
+      apiError.statusCode = 500;
+      throw apiError;
+    } else {
+      console.error(`[analyzeForm] UNEXPECTED ERROR: ${err.message}`);
+      throw err;
+    }
   }
-
-  return JSON.parse(jsonMatch[0]);
 }
