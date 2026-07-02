@@ -79,7 +79,9 @@ export class PerspectiveCrop {
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(pts[0].x, pts[0].y);
-    for (let i = 1; i < 4; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    for (let i = 1; i < 4; i++) {
+      ctx.lineTo(pts[i].x, pts[i].y);
+    }
     ctx.closePath();
     ctx.clip();
     ctx.drawImage(this.img, 0, 0, w, h);
@@ -90,7 +92,9 @@ export class PerspectiveCrop {
     ctx.lineWidth = 2.5;
     ctx.beginPath();
     ctx.moveTo(pts[0].x, pts[0].y);
-    for (let i = 1; i < 4; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    for (let i = 1; i < 4; i++) {
+      ctx.lineTo(pts[i].x, pts[i].y);
+    }
     ctx.closePath();
     ctx.stroke();
 
@@ -148,7 +152,9 @@ export class PerspectiveCrop {
 
     const onMove = (e) => {
       e.preventDefault();
-      if (this.dragging === null) return;
+      if (this.dragging === null) {
+        return;
+      }
       const pos = this.getEventPos(e);
       this.corners[this.dragging] = {
         x: Math.max(0, Math.min(1, pos.x)),

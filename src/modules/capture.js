@@ -7,7 +7,7 @@ import { config } from '../config.js';
 import { eventBus } from '../event-bus.js';
 import { stateManager } from '../state.js';
 import { getProfile } from '../profile.js';
-import { showToast, showLoadingOverlay, updateLoadingOverlay, dismissLoadingOverlay } from './ui-utils.js';
+import { showLoadingOverlay, updateLoadingOverlay, dismissLoadingOverlay } from './ui-utils.js';
 import { optimizeForAPI, getImageDimensions } from '../image-processor.js';
 
 let cameraInput = null;
@@ -64,7 +64,9 @@ export function initCapture() {
  */
 function handleImageSelect(e) {
   const file = e.target.files[0];
-  if (!file) return;
+  if (!file) {
+    return;
+  }
   const reader = new FileReader();
   reader.onload = (ev) => {
     showCropper(ev.target.result);
@@ -77,7 +79,9 @@ function handleImageSelect(e) {
  */
 function handleSavedImageSelect(e) {
   const file = e.target.files[0];
-  if (!file) return;
+  if (!file) {
+    return;
+  }
   const reader = new FileReader();
   reader.onload = (ev) => {
     stateManager.setState('capturedImageData', ev.target.result);
@@ -106,7 +110,9 @@ function showCropper(dataUrl) {
  */
 function handleCropConfirm() {
   const cropper = stateManager.getState('cropper');
-  if (!cropper) return;
+  if (!cropper) {
+    return;
+  }
 
   const croppedImage = cropper.getCroppedImage();
   stateManager.setState('capturedImageData', croppedImage);
@@ -154,7 +160,9 @@ export function resetCapture() {
  */
 function handleSaveCrop() {
   const imageData = stateManager.getState('capturedImageData');
-  if (!imageData) return;
+  if (!imageData) {
+    return;
+  }
 
   const link = document.createElement('a');
   link.download = 'cropped-form.jpg';
@@ -199,7 +207,7 @@ async function handleFillForm() {
   // Show loading overlay with progress
   const loadingOverlay = showLoadingOverlay(
     'Analyzing form and filling fields...',
-    'Step 1/3: Detecting form fields...'
+    'Step 1/3: Detecting form fields...',
   );
 
   try {

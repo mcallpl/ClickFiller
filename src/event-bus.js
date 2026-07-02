@@ -31,7 +31,9 @@ class EventBus {
    * @param {Function} callback - listener function
    */
   off(event, callback) {
-    if (!this.listeners[event]) return;
+    if (!this.listeners[event]) {
+      return;
+    }
 
     const index = this.listeners[event].indexOf(callback);
     if (index > -1) {
@@ -50,7 +52,9 @@ class EventBus {
    * @param {any} data - event data
    */
   emit(event, data = null) {
-    if (!this.listeners[event]) return;
+    if (!this.listeners[event]) {
+      return;
+    }
 
     this.listeners[event].forEach(callback => {
       try {

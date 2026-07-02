@@ -12,7 +12,7 @@
   },
   "rules": {
     "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
-    "no-console": ["warn", { "allow": ["warn", "error"] }],
+    "no-console": ["warn", { "allow": ["warn", "error", "debug"] }],
     "prefer-const": "warn",
     "no-var": "warn",
     "eqeqeq": ["warn", "always"],
@@ -34,6 +34,15 @@
       "files": ["tests/**/*.js"],
       "env": {
         "jest": true
+      },
+      "rules": {
+        "no-console": "off"
+      }
+    },
+    {
+      "files": ["server/**/*.js"],
+      "env": {
+        "node": true
       },
       "rules": {
         "no-console": "off"

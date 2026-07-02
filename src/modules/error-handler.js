@@ -46,7 +46,7 @@ export function initErrorHandling() {
  * @param {Object} data.action - optional { label: string, callback: function }
  */
 function handleError(data) {
-  const { message, title = 'Error', userFacing = false, action = null } = data;
+  const { message, title = 'Error', userFacing = false } = data;
 
   // Log to console always
   console.error('Application error:', message);

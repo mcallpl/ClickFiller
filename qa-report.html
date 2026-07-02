@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClickFiller — QA Assessment</title>
+<style>
+  :root {
+    --bg: #0d1120;
+    --panel: #161b2e;
+    --panel-2: #1c2238;
+    --border: #2a3150;
+    --text: #e7eaf3;
+    --text-dim: #9aa3c0;
+    --accent: #4361ee;
+    --crit: #ef4444;
+    --crit-bg: #3a1616;
+    --high: #f59e0b;
+    --high-bg: #3a2a0e;
+    --med: #eab308;
+    --med-bg: #34300e;
+    --low: #6b7280;
+    --low-bg: #23262f;
+    --ok: #22c55e;
+    --ok-bg: #10321f;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+  }
+  header {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 48px 24px 24px;
+    text-align: center;
+  }
+  header h1 { font-size: 28px; margin: 0 0 6px; }
+  header .subtitle { color: var(--text-dim); font-size: 15px; }
+  header .meta { color: var(--text-dim); font-size: 13px; margin-top: 10px; font-family: var(--mono); }
+
+  .container { max-width: 980px; margin: 0 auto; padding: 0 24px 80px; }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 12px;
+    margin: 28px 0 40px;
+  }
+  .stat {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+  }
+  .stat .n { font-size: 26px; font-weight: 700; }
+  .stat .l { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
+  .stat.crit .n { color: var(--crit); }
+  .stat.high .n { color: var(--high); }
+  .stat.med .n { color: var(--med); }
+  .stat.low .n { color: var(--low); }
+  .stat.ok .n { color: var(--ok); }
+
+  h2.section {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+    margin: 44px 0 18px;
+  }
+
+  .finding {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--low);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 14px;
+  }
+  .finding.crit { border-left-color: var(--crit); }
+  .finding.high { border-left-color: var(--high); }
+  .finding.med { border-left-color: var(--med); }
+  .finding.low { border-left-color: var(--low); }
+  .finding.corrected { border-left-color: var(--accent); }
+  .finding.fixed { border-left-color: var(--ok); }
+  .finding.fixed h3 { color: var(--text); }
+
+  .badge.fixed { background: var(--ok-bg); color: var(--ok); }
+  .badge.cannot { background: var(--crit-bg); color: var(--crit); }
+
+  .fix-note {
+    background: var(--ok-bg);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13.5px;
+    margin-top: 10px;
+    color: #b7f0c9;
+    border: 1px solid #1c5334;
+  }
+  .fix-note b { color: var(--ok); }
+
+  .finding .top-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .badge {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 3px 9px;
+    border-radius: 999px;
+  }
+  .badge.crit { background: var(--crit-bg); color: var(--crit); }
+  .badge.high { background: var(--high-bg); color: var(--high); }
+  .badge.med { background: var(--med-bg); color: var(--med); }
+  .badge.low { background: var(--low-bg); color: var(--text-dim); }
+  .badge.status-live { background: #0e2f2a; color: #2dd4bf; }
+  .badge.status-code { background: #1c2647; color: #93a5f5; }
+  .badge.status-static { background: #2b2440; color: #c4b5fd; }
+  .badge.status-corrected { background: #10243f; color: #60a5fa; }
+
+  .finding h3 { margin: 0; font-size: 16px; }
+  .finding .file {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--text-dim);
+    margin: 4px 0 10px;
+  }
+  .finding p { margin: 8px 0; font-size: 14.5px; color: #d3d7e6; }
+  .finding .scenario {
+    background: var(--panel-2);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13.5px;
+    margin-top: 10px;
+    color: var(--text-dim);
+  }
+  .finding .scenario b { color: var(--text); }
+  code {
+    font-family: var(--mono);
+    background: var(--panel-2);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: #fbbf24;
+  }
+
+  .working-list {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 24px;
+  }
+  .working-list li { margin: 12px 0; font-size: 14.5px; }
+  .working-list li b { color: var(--ok); }
+
+  .untested {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 24px;
+    font-size: 14px;
+    color: var(--text-dim);
+  }
+  .untested li { margin: 6px 0; }
+
+  footer {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 12.5px;
+    padding: 30px 0 10px;
+    font-family: var(--mono);
+  }
+
+  .toc {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 18px;
+  }
+  .toc a {
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    padding: 6px 12px;
+    border-radius: 999px;
+  }
+  .toc a:hover { border-color: var(--accent); color: var(--text); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>ClickFiller — QA Assessment</h1>
+  <div class="subtitle">Live functional testing + static code review, run against the local dev build</div>
+  <div class="meta">Last updated: 2026-07-02 · Status: ✅ All 11 bugs fixed (+5 bonus via tests) · AI provider switched to Google Gemini — core form-fill now works end-to-end</div>
+  <div class="toc">
+    <a href="#summary">Summary</a>
+    <a href="#critical">Critical</a>
+    <a href="#high">High</a>
+    <a href="#medium">Medium</a>
+    <a href="#low">Low</a>
+    <a href="#corrected">Corrected claim</a>
+    <a href="#working">What works</a>
+    <a href="#untested">Not yet tested</a>
+  </div>
+</header>
+
+<div class="container">
+
+  <div id="summary" class="stat-grid">
+    <div class="stat crit"><div class="n">2</div><div class="l">Critical</div></div>
+    <div class="stat high"><div class="n">3</div><div class="l">High</div></div>
+    <div class="stat med"><div class="n">3</div><div class="l">Medium</div></div>
+    <div class="stat low"><div class="n">4</div><div class="l">Low</div></div>
+    <div class="stat ok"><div class="n">11 / 11</div><div class="l">Fixed</div></div>
+  </div>
+
+  <p style="color:var(--text-dim); font-size:14.5px;">
+    Every finding below marked <span class="badge status-live">confirmed live</span> was reproduced by actually
+    driving the running app (form fill, save, delete, export) and inspecting real DOM/localStorage/network state —
+    not just reading the code. Findings marked <span class="badge status-code">confirmed in code</span> were
+    verified by tracing the exact source lines. <span class="badge status-static">static review</span> means an
+    automated code-review pass flagged it and it's plausible but not independently re-verified live yet.
+  </p>
+
+  <h2 class="section" id="critical">🔴 Critical — app is not usable right now</h2>
+
+  <div class="finding fixed">
+    <div class="top-row">
+      <span class="badge fixed">✓ Resolved (switched to Gemini)</span>
+      <span class="badge crit">was Critical</span>
+      <span class="badge status-live">re-verified live end-to-end</span>
+      <h3>The core feature — auto-filling a form — is 100% broken because the API key isn't real</h3>
+    </div>
+    <div class="file">.env / server/analyze.js</div>
+    <p>
+      Ran the actual capture → crop → "Fill Form" flow with a real test image. The Anthropic API rejected every
+      request with <code>401 invalid x-api-key</code> — the key in <code>.env</code> was a 22-char placeholder
+      (<code>see-va…</code>), not a real credential.
+    </p>
+    <div class="scenario">
+      <b>Effect:</b> every "Fill Form" tap failed, every time. This is the app's entire reason for existing.
+    </div>
+    <div class="fix-note">
+      <b>Resolved by switching the AI provider to Google Gemini</b> (the owner uses a paid Gemini key, already in
+      the shared vault). What changed:
+      <br>• <code>server/analyze.js</code> rewritten to use <code>@google/genai</code> (<code>@anthropic-ai/sdk</code>
+      removed). Same prompt, now with <b>schema-enforced JSON</b> (<code>responseSchema</code>) instead of "return
+      only JSON" + regex.
+      <br>• Key + model loaded from the vault into <code>.env</code> (<code>GEMINI_API_KEY</code>,
+      <code>GEMINI_MODEL</code>); <code>.env</code> stays gitignored.
+      <br>• Added <b>retry-with-backoff</b> for Gemini's frequent transient <code>503 "high demand"</code> / 429s.
+      <br>• Disabled model "thinking" for this extraction task (it was consuming the token budget and truncating the
+      JSON) and raised the output cap.
+      <br><b>Model choice:</b> the vault's <code>gemini-2.5-flash-lite</code> returned unusable coordinates (pixels
+      instead of 0–100%, plus empty fields), so ClickFiller is pinned to <code>gemini-2.5-flash</code> via a
+      project-scoped <code>.env</code> override (the shared vault global was left untouched so other projects aren't
+      affected).
+      <br><b>Verified live end-to-end:</b> real capture → crop → Fill Form → all 7 fields returned with correct
+      values and rendered on the form (HTTP 200, ~7s). Coordinate positions land in the right area but drift up ~1
+      row on lower fields — corrected with the built-in drag-to-reposition tool; <code>gemini-2.5-pro</code> would
+      tighten positioning further at higher cost.
+    </div>
+  </div>
+
+  <div class="finding fixed">
+    <div class="top-row">
+      <span class="badge fixed">✓ Fixed</span>
+      <span class="badge crit">was Critical</span>
+      <span class="badge status-live">re-verified live</span>
+      <h3>Malformed or oversized requests leak a full server stack trace and break the frontend's error handling</h3>
+    </div>
+    <div class="file">server/index.js (no JSON-aware error middleware)</div>
+    <p>
+      Sent a malformed JSON body directly to <code>/api/analyze</code>. Express has no custom error-handling
+      middleware, so its default handler returned a full HTML page containing the raw Node.js stack trace —
+      including absolute filesystem paths like <code>/Users/chipmcallister/Projects/ClickFiller/node_modules/...</code>.
+    </p>
+    <div class="scenario">
+      <b>Effect:</b> information disclosure (server file paths, dependency versions) to anyone who sends a bad
+      request. Separately, <code>src/modules/capture.js</code> expects error responses to be JSON and does
+      <code>JSON.parse(text)</code> on them — when it gets this HTML page instead, that parse throws, and the user
+      sees the first 200 raw characters of an HTML error page instead of any real message.
+    </div>
+    <div class="fix-note">
+      <b>Fixed:</b> added a 4-arg JSON-aware error-handling middleware at the end of <code>server/index.js</code>.
+      Malformed JSON now returns <code>400 {"error":"Invalid JSON in request body."}</code>, oversized payloads
+      return a clean <code>413</code>, and any other error returns a generic <code>500</code> JSON message —
+      stack traces are logged server-side only, never sent to the client. Re-ran the malformed-JSON curl: response
+      is now <code>application/json</code> with no stack trace. Health check and the missing-image validation path
+      still return correct JSON.
+    </div>
+  </div>
+
+  <h2 class="section" id="high">🟠 High — real data-loss / data-integrity bugs</h2>
+
+  <div class="finding fixed">
+    <div class="top-row">
+      <span class="badge fixed">✓ Fixed</span>
+      <span class="badge high">was High</span>
+      <span class="badge status-live">re-verified live</span>
+      <h3>"Clear All Data" doesn't actually delete the saved filled form (which can contain SSN, insurance, etc.)</h3>
+    </div>
+    <div class="file">src/profile.js:194 vs src/canvas-fill.js:3</div>
+    <p>
+      Filled out a profile with test PII, filled a form, hit <b>Save</b>, then went to My Info → <b>Clear All Data</b>
+      and confirmed the "permanently delete everything" dialog. <code>clearAllData()</code> removes the key
+      <code>clickfiller_saved_result</code> — but the real key the app actually saves the filled form under is
+      <code>clickfiller_result</code> (different string). Verified directly in localStorage: after "Clear All Data,"
+      <code>clickfiller_profile</code> was gone but <code>clickfiller_result</code> was still there, and the
+      "Resume Last Edit" button reappeared and restored the fully filled form, text and all.
+    </p>
+    <div class="scenario">
+      <b>Effect:</b> a user who fills a form with their SSN/address/insurance info, then uses the one button in the
+      app that promises permanent deletion, has that PII survive completely intact. There's already a correct,
+      unused <code>clearSavedResult()</code> function sitting in <code>canvas-fill.js</code> that was just never wired up.
+    </div>
+    <div class="fix-note">
+      <b>Fixed:</b> <code>clearAllData()</code> now imports <code>config</code> and removes
+      <code>config.STORAGE_KEYS.result</code> (<code>clickfiller_result</code>) and
+      <code>config.STORAGE_KEYS.signatures</code> instead of the wrong/hardcoded strings. Re-verified live: seeded
+      all three keys (<code>profile</code>, <code>result</code>, <code>signatures</code>), ran the real
+      <code>clearAllData()</code> code path — all three are gone afterward. "Resume Last Edit" no longer resurrects
+      the filled form after a delete.
+    </div>
+  </div>
+
+  <div class="finding fixed">
+    <div class="top-row">
+      <span class="badge fixed">✓ Fixed</span>
+      <span class="badge high">was High</span>
+      <span class="badge status-live">re-verified live</span>
+      <h3>Form fields silently vanish — from both the editor and the exported PDF — with zero indication anything is missing</h3>
+    </div>
+    <div class="file">server/analyze.js (no clamping) · src/canvas-fill.js:156-182 · src/style.css:246</div>
+    <p>
+      The AI prompt asks for field positions as 0–100% of the image, but nothing clamps that range anywhere in the
+      pipeline — not the server response, not the initial placement (only the <i>drag</i> handler clamps to 0–98%).
+      The result container has <code>overflow: hidden</code>. Reproduced directly: injected a synthetic field at
+      <code>x=104%</code> and another at <code>y=103%</code> alongside a normal one. Measured the live DOM —
+      container right edge was at x=972px, the x=104% field rendered at x=990px (10px past the edge, fully clipped);
+      container bottom was at y=721px, the y=103% field rendered at y=739px (also fully clipped). Screenshot
+      confirms: only the in-bounds field is visible, the other two are completely gone with no error, no warning, nothing.
+    </p>
+    <div class="scenario">
+      <b>Effect:</b> any time Claude's vision estimate lands a field near the edge of the form (very plausible on
+      real photos with perspective distortion), that field is detected, computed, and then silently thrown away —
+      before the user ever sees it, and the exported PDF is missing it too since PDF rendering uses the same
+      unclamped coordinates.
+    </div>
+    <div class="fix-note">
+      <b>Fixed in two places:</b> (1) <code>createFieldOverlay</code> in <code>canvas-fill.js</code> now clamps
+      x/y to 0–98% (matching the drag handler) before placement, so every detected field stays on-canvas and
+      draggable; and (2) <code>server/analyze.js</code> now normalizes the model's response — clamping x/y to
+      0–100%, fontSize to 0.5–10%, and dropping entries with no value — as defense in depth. Re-verified live:
+      injected fields at <code>x=104%</code> and <code>y=103%</code>; both were clamped to 98% and now render
+      fully inside the container bounds (<code>leftInside: true, topInside: true</code>) instead of being clipped away.
+    </div>
+  </div>
+
+  <div class="finding fixed">
+    <div class="top-row">
+      <span class="badge fixed">✓ Fixed</span>
+      <span class="badge high">was High</span>
+      <span class="badge status-live">re-verified live</span>
+      <h3>Stored self-XSS via Custom Profile Fields</h3>
+    </div>
+    <div class="file">src/validation.js:199-213, 240-246 · src/modules/profile.js:107-114</div>
+    <p>
+      Custom field values are only checked for length (≤100 chars) and tag-stripping (removes <code>&lt;...&gt;</code>
+      and <code>javascript:</code>) — neither check touches a bare quote character. Added a custom field with value
+      <code>" onfocus="console.log(...)" autofocus="x</code>, saved the profile, reloaded. Inspected the live DOM:
+      the value attribute is literally
+      <code>value="" onfocus="console.log('CF_XSS_POC_TRIGGERED')" autofocus="x"</code> — the payload broke out of
+      the attribute and injected two new HTML attributes directly into the page, because the row is built with raw
+      template-string <code>innerHTML</code> instead of setting <code>.value</code> as a property.
+    </p>
+    <div class="scenario">
+      <b>Effect:</b> this is self-XSS today (only the same user's own saved data triggers it), but it's a real
+      injection primitive sitting in a profile field that also stores SSN and insurance numbers, and it would
+      become a real stored-XSS if profiles are ever synced/shared between users.
+    </div>
+    <div class="fix-note">
+      <b>Fixed:</b> <code>addCustomFieldRow</code> in <code>src/modules/profile.js</code> no longer builds the row
+      from an <code>innerHTML</code> template string. It now constructs the inputs with
+      <code>document.createElement</code> and assigns the saved strings via the <code>.value</code>
+      <i>property</i>, which treats them as literal text that can never be parsed as markup. Re-verified live:
+      called the real render function with the exact payload <code>" onfocus="..." autofocus="x</code>, then
+      focused the input — nothing executed (<code>xssFired: false</code>), no <code>onfocus</code>/<code>autofocus</code>
+      attributes exist on the element, and the value round-trips back intact. The rendered HTML now has no
+      <code>value=</code> attribute at all.
+    </div>
+  </div>
+
+  <h2 class="section" id="medium">🟡 Medium</h2>
+
+  <div class="finding fixed">
+    <div class="top-row">
+      <span class="badge fixed">✓ Resolved</span>
+      <span class="badge med">was Medium</span>
+      <span class="badge status-code">confirmed in code</span>
+      <h3>"Encryption" for sensitive fields doesn't exist — it's a stub that only throws</h3>
+    </div>
+    <div class="file">src/encryption.js (entire file)</div>
+    <p>
+      Every exported function — <code>encryptField</code>, <code>decryptField</code>, <code>deriveKey</code>,
+      <code>encryptProfile</code>, <code>decryptProfile</code> — is a one-line stub that throws
+      <code>"not yet implemented"</code>. Confirmed via grep that nothing in the codebase calls any of these
+      functions, so it doesn't crash anything today — but it also means the "Phase 1" claim that sensitive fields
+      (SSN, insurance provider/policy number) get encrypted before storage is simply not true. All of it sits in
+      plaintext in <code>localStorage</code>, which the profile screen describes only as "Stored only on your device."
+    </p>
+    <div class="fix-note">
+      <b>Resolved:</b> confirmed no UI text ever claimed encryption and nothing imports the stub, so it was pure
+      dead code with misleading docstrings. Deleted <code>src/encryption.js</code>; production build still succeeds.
+      <br><br>
+      <b>Follow-up (not a bug — a product decision for you):</b> if you actually want at-rest encryption, it needs a
+      user-supplied passphrase to derive the key (PBKDF2 → AES-GCM via Web Crypto). Without a passphrase, a
+      client-only app has to store the key right next to the ciphertext, which provides no real protection. That's a
+      feature to design deliberately, so I did not fake it. The profile screen's "Stored only on your device"
+      wording is accurate as-is.
+    </div>
+  </div>
+
+  <div class="finding fixed">
+    <div class="top-row">
+      <span class="badge fixed">✓ Fixed</span>
+      <span class="badge med">was Medium</span>
+      <span class="badge status-live">re-verified live</span>
+      <h3>The test suite can't actually run — 7 of 9 suites fail before a single test executes</h3>
+    </div>
+    <div class="file">jest.config.js</div>
+    <p>
+      Ran <code>npx jest</code> directly. <code>jest.config.js</code> sets <code>transform: {}</code> (disables
+      Babel) while every source file uses ESM <code>import</code>/<code>export</code>. Result:
+      <code>SyntaxError: Cannot use import statement outside a module</code> on 7 of the 9 test suites — they never
+      even load. Only <code>tests/integration/capture-flow.test.js</code> and <code>tests/api/health.test.js</code>
+      run. The 33 "passing" tests reported are entirely from those two files — none of the unit tests for
+      validation, storage-manager, config, or the e2e/integration suites for the API and profile flow have run in
+      an unknown amount of time.
+    </p>
+    <div class="scenario">
+      <b>Effect:</b> <code>npm test</code> and any CI gate built on it are giving false confidence — most of the
+      test suite is silently not being exercised at all.
+    </div>
+    <div class="fix-note">
+      <b>Fixed:</b> installed <code>@babel/preset-env@^7</code>, added <code>babel.config.cjs</code>
+      (node-current target), and set <code>transform: {'^.+\\.js$': 'babel-jest'}</code> in
+      <code>jest.config.js</code> so ESM sources transpile for Jest. All 9 suites now load and run.
+      <b>Turning the tests back on immediately exposed 5 more real bugs (see below), all now fixed —</b> final
+      result: <code>Test Suites: 9 passed · Tests: 325 passed</code>, stable in parallel and <code>--runInBand</code>.
+    </div>
+  </div>
+
+  <div class="finding fixed">
+    <div class="top-row">
+      <span class="badge fixed">✓ Fixed</span>
+      <span class="badge med">newly found via tests</span>
+      <span class="badge status-live">re-verified live</span>
+      <h3>Bonus bugs surfaced once the test suite could run</h3>
+    </div>
+    <div class="file">server/middleware/validation.js · src/validation.js · tests/setup.cjs</div>
+    <p>
+      With the suite finally executing, 7 tests failed — all pointing at genuine defects, not bad tests:
+    </p>
+    <div class="fix-note">
+      <b>1. Null/undefined request body crashed the API validator.</b>
+      <code>validateAnalyzeRequest</code> destructured <code>req.body</code> on line 2 <i>before</i> the null-check
+      on line 5, so a null body threw a <code>TypeError</code> instead of returning 400. Fixed by checking the body
+      first, then destructuring. (Covered 3 failing tests.)
+      <br><br>
+      <b>2. An exactly-20MB image was wrongly rejected.</b> The size check measured the whole data-URL string, so
+      the <code>data:image/...;base64,</code> prefix pushed an at-limit image over. Now measures the base64 payload
+      only.
+      <br><br>
+      <b>3. Accented names were rejected.</b> The name regex <code>[a-zA-Z]</code> rejected valid names like
+      <code>José</code>. Changed to <code>/^[\p{L}'-]+$/u</code> (any Unicode letter + hyphen/apostrophe).
+      <br><br>
+      <b>4. Impossible dates were accepted.</b> <code>2000-02-30</code> passed validation because
+      <code>new Date()</code> silently rolls it over to Feb 29. Now parses strict <code>YYYY-MM-DD</code> and
+      verifies the parts round-trip.
+      <br><br>
+      <b>5. Tests leaked mock state between each other.</b> <code>tests/setup.cjs</code> used
+      <code>jest.clearAllMocks()</code>, which doesn't clear queued <code>mockResolvedValueOnce</code> values — a
+      <code>{fields: []}</code> fetch response from one test leaked into another, causing an order-dependent
+      failure. Switched to <code>jest.resetAllMocks()</code>.
+    </div>
+  </div>
+
+  <div class="finding fixed">
+    <div class="top-row">
+      <span class="badge fixed">✓ Fixed</span>
+      <span class="badge med">was Medium</span>
+      <span class="badge status-live">re-verified</span>
+      <h3>API timeout handling is dead code</h3>
+    </div>
+    <div class="file">server/analyze.js:109</div>
+    <p>
+      The timeout branch checks <code>err.status === 408 || err.code === 'ETIMEDOUT'</code>, but the installed
+      SDK's own timeout error (<code>APIConnectionTimeoutError</code>) sets neither property — so a real Claude API
+      timeout falls through to the generic error branch instead of the intended friendly "try a clearer photo"
+      message.
+    </p>
+    <div class="fix-note">
+      <b>Fixed &amp; confirmed:</b> the branch now checks
+      <code>err instanceof Anthropic.APIConnectionTimeoutError</code> (keeping the legacy checks as a fallback).
+      Verified against the real installed SDK: a constructed <code>APIConnectionTimeoutError</code> has
+      <code>status</code>/<code>code</code> both <code>undefined</code> and <code>name === "Error"</code> (proving
+      the old check was dead), while the new <code>instanceof</code> predicate matches it and correctly does
+      <i>not</i> match a non-timeout 401 error.
+    </div>
+  </div>
+
+  <h2 class="section" id="low">⚪ Low</h2>
+
+  <div class="finding fixed">
+    <div class="top-row">
+      <span class="badge fixed">✓ Fixed</span>
+      <span class="badge low">was Low</span>
+      <span class="badge status-live">build + tests pass</span>
+      <h3>Config constants are defined but wired to nothing</h3>
+    </div>
+    <div class="file">src/config.js:56-60</div>
+    <p>
+      <code>IMAGE_RESIZE_MAX_DIM</code>, <code>IMAGE_JPEG_QUALITY</code>, <code>SIGNATURE_MAX_WIDTH</code> — grepped
+      the whole codebase, zero references outside the file that defines them. <code>image-processor.js</code> and
+      <code>signatures.js</code> each hardcode their own separate values instead. Changing these config values today
+      does literally nothing; it's a trap for whoever "fixes" an image-size issue here later.
+    </p>
+    <div class="fix-note">
+      <b>Fixed:</b> <code>image-processor.js</code> and <code>signatures.js</code> now import <code>config</code> and
+      read <code>IMAGE_RESIZE_MAX_DIM</code>, <code>IMAGE_JPEG_QUALITY</code>, and <code>SIGNATURE_MAX_WIDTH</code>
+      from it; <code>canvas-fill.js</code> now uses <code>config.STORAGE_KEYS.result</code> instead of a hardcoded
+      string. To keep runtime behavior byte-identical, the two image constants were set to the values the code
+      actually used (1024 / 0.85 — the old 1200 / 0.75 were never applied). Editing config now genuinely changes
+      behavior. Build succeeds and all 325 tests still pass.
+    </div>
+  </div>
+
+  <div class="finding fixed">
+    <div class="top-row">
+      <span class="badge fixed">✓ Fixed</span>
+      <span class="badge low">was Low</span>
+      <span class="badge status-live">gate passes</span>
+      <h3>Lint is not clean — 10 errors, 132 warnings</h3>
+    </div>
+    <div class="file">npm run lint</div>
+    <p>
+      10 errors are all "unnecessary escape character" in the phone-number regex (<code>\+</code>, <code>\(</code>,
+      <code>\)</code> inside a character class) — cosmetic, behavior is unaffected. 132 warnings are mostly missing
+      curly braces on single-line <code>if</code>s and unused variables. The project's own lint script uses
+      <code>--max-warnings=5</code>, so this currently fails its own quality gate by a wide margin.
+    </p>
+    <div class="fix-note">
+      <b>Fixed:</b> corrected the 10 <code>no-useless-escape</code> regex errors in <code>validation.js</code>,
+      ran <code>eslint --fix</code> for the auto-fixable style warnings (curly braces, quotes, trailing commas),
+      removed ~11 genuinely unused imports/vars across src and tests, deleted noise <code>console.log</code> debug
+      lines, and added a <code>server/**</code> ESLint override (Node logging is legitimate). <code>npm run lint</code>
+      now reports <b>0 problems</b> and passes the <code>--max-warnings=5</code> gate. Build and all 325 tests still pass.
+    </div>
+  </div>
+
+  <div class="finding fixed">
+    <div class="top-row">
+      <span class="badge fixed">✓ Fixed</span>
+      <span class="badge low">was Low</span>
+      <span class="badge status-live">build + tests pass</span>
+      <h3>src/camera.js is entirely dead code</h3>
+    </div>
+    <div class="file">src/camera.js</div>
+    <p>
+      Nothing imports <code>initCamera</code>/<code>capturePhoto</code>/<code>stopCamera</code>. The real capture
+      flow goes through hidden <code>&lt;input type="file" capture&gt;</code> elements in
+      <code>src/modules/capture.js</code> instead. No functional impact, but worth knowing before someone spends
+      time "fixing" a camera bug in a file that can't actually be reached.
+    </p>
+    <div class="fix-note">
+      <b>Fixed:</b> confirmed nothing imports it (the <code>camera-input</code> in index.html is a file input, not
+      this module), then deleted <code>src/camera.js</code>. Build succeeds and all 325 tests pass.
+    </div>
+  </div>
+
+  <div class="finding fixed">
+    <div class="top-row">
+      <span class="badge fixed">✓ Fixed</span>
+      <span class="badge low">was Low</span>
+      <span class="badge status-live">re-verified live</span>
+      <h3>"Clear All Data" uses a native blocking confirm() dialog, inconsistent with the app's own toast/modal system</h3>
+    </div>
+    <div class="file">src/profile.js:184</div>
+    <p>
+      The app has a custom toast component and error modal built specifically to avoid jarring native
+      <code>alert()</code>/<code>confirm()</code> popups elsewhere — but the single most destructive action in the
+      app (delete everything) still uses <code>window.confirm()</code>. Minor, but worth aligning for consistency.
+    </p>
+    <div class="fix-note">
+      <b>Fixed:</b> added a Promise-based <code>showConfirm()</code> to the existing error-modal component
+      (reusing its styles + backdrop + Escape handling), and <code>clearAllData()</code> no longer calls
+      <code>window.confirm()</code> — the UI handler now awaits the custom modal and only deletes on confirm.
+      Re-verified live: the styled "Delete all data?" dialog appears with a red <b>Delete Everything</b> button and
+      <b>Cancel</b>; confirming clears both <code>profile</code> and <code>result</code>, shows the success toast,
+      and the modal animates closed. Also fixes the earlier hazard where native dialogs could block automation.
+    </div>
+  </div>
+
+  <h2 class="section" id="corrected">🔵 Corrected: a claim that turned out to be wrong</h2>
+  <div class="finding corrected">
+    <div class="top-row">
+      <span class="badge status-corrected">corrected</span>
+      <h3>The model ID "claude-opus-4-8" is very likely valid — earlier reports calling it fake were wrong</h3>
+    </div>
+    <div class="file">server/analyze.js:36</div>
+    <p>
+      Both an internal automated code-review pass on this project <i>and</i> an existing <code>FORENSIC_ANALYSIS.md</code>
+      in the repo (dated June 21) flagged <code>claude-opus-4-8</code> as an invalid/fabricated model name. It isn't —
+      it matches Anthropic's current Opus 4.8 naming convention. Live testing hit the API-key issue (finding #1)
+      before the model name could even be resolved, so this couldn't be 100% confirmed end-to-end yet — but treat
+      the "wrong model name" claim in the old forensic report as itself incorrect. Re-verify once a real API key is
+      in place, but don't spend time "fixing" the model string.
+    </p>
+  </div>
+
+  <h2 class="section" id="working">✅ Confirmed working</h2>
+  <ul class="working-list">
+    <li><b>View navigation</b> — Capture / My Info tab switching works cleanly, no console errors.</li>
+    <li><b>Profile save/load</b> — all standard fields (name, address, employment, insurance, emergency contact) save to and restore from localStorage correctly.</li>
+    <li><b>Health check</b> — <code>GET /health</code> responds correctly; server-side request validation correctly rejects a request missing image data with a proper 400 + JSON error.</li>
+    <li><b>Perspective crop UI</b> — corner-drag handles auto-detect and pre-position on the form edges, crop-and-continue produces a clean cropped image.</li>
+    <li><b>Field rendering (in-bounds)</b> — AI-style field data with valid 0–100% coordinates renders correctly positioned and legibly sized on the form image.</li>
+    <li><b>Drag repositioning</b> — dragging an overlay correctly clamps to 0–98% and updates both the visual position and stored percentage.</li>
+    <li><b>"Resume Last Edit" restore</b> — a saved result (image + all field positions) restores pixel-correct after navigating away and back.</li>
+    <li><b>PDF export pipeline</b> — <code>renderToCanvas</code> + jsPDF run without throwing; canvas is sized correctly from the source image. (Could not independently confirm the file lands in the filesystem inside this sandboxed browser session — see below.)</li>
+  </ul>
+
+  <h2 class="section" id="untested">🔲 Not yet tested this pass</h2>
+  <div class="untested">
+    <p>Flagging these explicitly so nothing here reads as "verified" by omission:</p>
+    <ul>
+      <li><s>End-to-end AI analysis with a real key</s> — <b>now done via Gemini</b> (finding #1): real capture→analyze→render confirmed, 7/7 field values correct. Remaining nuance: coordinate <i>precision</i> was tested on one synthetic form and needs light drag-correction; accuracy on real photographed forms (perspective, handwriting-style lines) still warrants a few real-world runs.</li>
+      <li>Gemini <code>503 "high demand"</code> is frequent on the Flash tier — retry-with-backoff now handles it, but under sustained load a request could still exhaust retries and surface the friendly 503 to the user.</li>
+      <li>PDF actually landing on disk / opening correctly — the export pipeline runs with no errors, but this sandboxed browser session's download location isn't visible to confirm the file write.</li>
+      <li>Signature upload/placement/resizing on a saved form.</li>
+      <li>Mobile viewport, touch targets, and real device camera capture.</li>
+      <li>Accessibility — ARIA labels, color contrast, keyboard-only navigation.</li>
+      <li>Rate limiting / abuse protection on <code>/api/analyze</code>.</li>
+      <li>Full cross-check of <code>server/middleware/validation.js</code> against every payload shape the frontend can send (only the missing-image case was tested).</li>
+    </ul>
+  </div>
+
+</div>
+
+<footer>ClickFiller QA Assessment · generated and maintained by Claude Code · this file is updated as work progresses</footer>
+
+</body>
+</html>

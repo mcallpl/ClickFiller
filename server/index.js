@@ -3,7 +3,6 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import fs from 'fs';
 import { analyzeForm } from './analyze.js';
 import { validateAnalyzeRequest } from './middleware/validation.js';
 
@@ -71,7 +70,7 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     timestamp: Date.now(),
-    service: 'ClickFiller API'
+    service: 'ClickFiller API',
   });
 });
 
@@ -92,6 +91,27 @@ app.post('/api/analyze', validateAnalyzeRequest, async (req, res) => {
     console.error(`[POST /api/analyze] Error (${statusCode}): ${errorMessage}`);
     res.status(statusCode).json({ error: errorMessage });
   }
+});
+
+// JSON-aware error handler — MUST be last and have 4 args so Express treats it
+// as an error handler. Without this, malformed/oversized request bodies fall
+// through to Express's default handler, which returns an HTML page containing a
+// full Node.js stack trace (including absolute filesystem paths).
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  // Body-parser: malformed JSON
+  if (err.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'Invalid JSON in request body.' });
+  }
+  // Body-parser: payload exceeded the 20mb limit
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'Request too large. The image may exceed the size limit.' });
+  }
+
+  // Anything else: log server-side, return a generic message. Never leak the
+  // stack trace or internal error details to the client.
+  console.error(`[error] ${req.method} ${req.path}: ${err.message}`);
+  res.status(err.statusCode || err.status || 500).json({ error: 'Internal server error.' });
 });
 
 app.listen(PORT, () => {

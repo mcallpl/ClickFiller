@@ -89,7 +89,7 @@ describe('StorageManager', () => {
       const largeProfile = {
         firstName: 'John',
         ...Object.fromEntries(
-          Array(10).fill(0).map((_, i) => [`field${i}`, 'A'.repeat(50)])
+          Array(10).fill(0).map((_, i) => [`field${i}`, 'A'.repeat(50)]),
         ),
       };
       const result = StorageManager.saveProfile(largeProfile);

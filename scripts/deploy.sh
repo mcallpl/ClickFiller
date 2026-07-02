@@ -11,7 +11,7 @@
 #
 # Prerequisites:
 #   - Docker and docker-compose installed
-#   - .env file with ANTHROPIC_API_KEY set
+#   - .env file with GEMINI_API_KEY set (and optional GEMINI_MODEL)
 #   - Git repository clean (no uncommitted changes)
 #
 ##############################################################################
@@ -78,12 +78,12 @@ check_prerequisites() {
   fi
   log_info ".env file found"
 
-  # Check ANTHROPIC_API_KEY
-  if ! grep -q "ANTHROPIC_API_KEY=" .env; then
-    log_error "ANTHROPIC_API_KEY not set in .env"
+  # Check GEMINI_API_KEY
+  if ! grep -q "GEMINI_API_KEY=" .env; then
+    log_error "GEMINI_API_KEY not set in .env"
     exit 1
   fi
-  log_info "ANTHROPIC_API_KEY configured"
+  log_info "GEMINI_API_KEY configured"
 }
 
 build_docker_image() {

@@ -4,7 +4,7 @@
  */
 
 import { validateProfile, getFieldError, sanitizeCustomValue } from '../../src/validation.js';
-import { VALID_PROFILE, INVALID_PROFILE, PARTIAL_PROFILE, PROFILE_WITH_CUSTOM_FIELDS } from '../helpers/mock-data.js';
+import { VALID_PROFILE, PARTIAL_PROFILE, PROFILE_WITH_CUSTOM_FIELDS } from '../helpers/mock-data.js';
 
 describe('Validation Module', () => {
   describe('validateProfile()', () => {

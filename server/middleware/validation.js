@@ -1,10 +1,12 @@
 export function validateAnalyzeRequest(req, res, next) {
-  const { image, profile } = req.body;
-
-  // Check if body exists
+  // Check the body FIRST, before destructuring. Destructuring a null/undefined
+  // req.body throws a TypeError, which previously crashed this middleware
+  // instead of returning a clean 400.
   if (!req.body || typeof req.body !== 'object') {
     return res.status(400).json({ error: 'Request body is required and must be JSON' });
   }
+
+  const { image, profile } = req.body;
 
   // Check if image exists and is a string (base64 data URL)
   if (!image || typeof image !== 'string') {
@@ -16,11 +18,13 @@ export function validateAnalyzeRequest(req, res, next) {
     return res.status(400).json({ error: 'Missing or invalid profile data (must be an object)' });
   }
 
-  // Check image size (loose check: base64 string length)
-  // Base64 is ~1.33x original size, so 20MB base64 ≈ 15MB original
-  const maxSize = 20 * 1024 * 1024; // 20MB in bytes
-  if (image.length > maxSize) {
-    return res.status(400).json({ error: `Image too large (max 20MB, got ${(image.length / 1024 / 1024).toFixed(1)}MB)` });
+  // Check image size. The limit applies to the base64 PAYLOAD, not the whole
+  // data-URL string — otherwise the `data:image/...;base64,` prefix pushes an
+  // exactly-at-limit image over the edge and it gets wrongly rejected.
+  const maxSize = 20 * 1024 * 1024; // 20MB of base64 data
+  const base64Payload = image.includes(',') ? image.slice(image.indexOf(',') + 1) : image;
+  if (base64Payload.length > maxSize) {
+    return res.status(400).json({ error: `Image too large (max 20MB, got ${(base64Payload.length / 1024 / 1024).toFixed(1)}MB)` });
   }
 
   // Check if image looks like a data URL

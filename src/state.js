@@ -21,7 +21,9 @@ class StateManager {
    * @returns {any} The state value at the path
    */
   getState(path = null) {
-    if (!path) return this.state;
+    if (!path) {
+      return this.state;
+    }
 
     const keys = path.split('.');
     let value = this.state;

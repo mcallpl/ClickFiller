@@ -65,7 +65,9 @@ export function showToast(message, type = 'info', duration = TOAST_DEFAULTS.dura
  * Dismiss a specific toast
  */
 function dismissToast(toast) {
-  if (!toast || !toast.parentNode) return;
+  if (!toast || !toast.parentNode) {
+    return;
+  }
 
   clearTimeout(toast.timeoutId);
   toast.classList.add('toast-dismissing');

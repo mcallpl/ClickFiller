@@ -38,5 +38,11 @@ export default {
   testPathIgnorePatterns: ['/node_modules/', '/dist/'],
   coverageReporters: ['text', 'text-summary', 'html', 'json'],
   coverageDirectory: 'coverage',
-  transform: {},
+  // Transform ESM source/tests to CJS via babel-jest (see babel.config.cjs).
+  // The previous `transform: {}` disabled all transformation, which made every
+  // ESM `import` throw "Cannot use import statement outside a module" and
+  // prevented 7 of 9 test suites from loading at all.
+  transform: {
+    '^.+\\.js$': 'babel-jest',
+  },
 };

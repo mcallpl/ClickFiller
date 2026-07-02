@@ -78,10 +78,14 @@ export function showLoadingOverlay(message, step = null) {
  * @param {string} step - new step description
  */
 export function updateLoadingOverlay(overlay, message, step = null) {
-  if (!overlay || !overlay.parentNode) return;
+  if (!overlay || !overlay.parentNode) {
+    return;
+  }
 
   const messageEl = overlay.querySelector('.loading-spinner-text');
-  if (messageEl) messageEl.textContent = message;
+  if (messageEl) {
+    messageEl.textContent = message;
+  }
 
   const stepEl = overlay.querySelector('.loading-spinner-step');
   if (step) {
@@ -103,7 +107,9 @@ export function updateLoadingOverlay(overlay, message, step = null) {
  * @param {HTMLElement} overlay - loading overlay element
  */
 export function dismissLoadingOverlay(overlay) {
-  if (!overlay || !overlay.parentNode) return;
+  if (!overlay || !overlay.parentNode) {
+    return;
+  }
 
   overlay.classList.add('loading-overlay-dismissing');
   setTimeout(() => {

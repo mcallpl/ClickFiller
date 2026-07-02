@@ -27,7 +27,9 @@ describe('API Integration Tests', () => {
 
   const createMockNext = () => {
     let called = false;
-    const fn = () => { called = true; };
+    const fn = () => {
+      called = true; 
+    };
     fn.wasCalled = () => called;
     return fn;
   };

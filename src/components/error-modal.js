@@ -30,7 +30,7 @@ export function showError(title, message, action = null) {
 
   let actionButton = '';
   if (action) {
-    const { label, callback } = action;
+    const { label } = action;
     actionButton = `
       <button id="error-action-btn" class="btn btn-primary">
         ${escapeHtml(label)}
@@ -97,10 +97,93 @@ export function showError(title, message, action = null) {
 }
 
 /**
+ * Show a confirmation dialog styled like the app's error modal.
+ * Replaces native window.confirm() for consistency and to avoid blocking dialogs.
+ * @param {string} title - Dialog title
+ * @param {string} message - Dialog message
+ * @param {object} options - { confirmLabel, cancelLabel, danger }
+ * @returns {Promise<boolean>} Resolves true if confirmed, false otherwise
+ */
+export function showConfirm(title, message, options = {}) {
+  const {
+    confirmLabel = 'Confirm',
+    cancelLabel = 'Cancel',
+    danger = false,
+  } = options;
+
+  if (currentModal) {
+    closeErrorModal();
+  }
+
+  return new Promise((resolve) => {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'error-modal-backdrop';
+    backdrop.setAttribute('aria-hidden', 'true');
+
+    const modal = document.createElement('div');
+    modal.className = 'error-modal';
+    modal.setAttribute('role', 'alertdialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'error-modal-title');
+    modal.setAttribute('aria-describedby', 'error-modal-message');
+
+    modal.innerHTML = `
+      <div class="error-modal-content">
+        <div class="error-modal-header">
+          <h2 id="error-modal-title" class="error-modal-title" tabindex="-1">⚠ ${escapeHtml(title)}</h2>
+        </div>
+        <div id="error-modal-message" class="error-modal-message">
+          ${escapeHtml(message)}
+        </div>
+        <div class="error-modal-actions">
+          <button id="confirm-ok-btn" class="btn ${danger ? 'btn-danger' : 'btn-primary'}">
+            ${escapeHtml(confirmLabel)}
+          </button>
+          <button id="confirm-cancel-btn" class="btn btn-secondary">
+            ${escapeHtml(cancelLabel)}
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(backdrop);
+    document.body.appendChild(modal);
+    currentModal = { modal, backdrop };
+
+    let settled = false;
+    const finish = (result) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      closeErrorModal();
+      resolve(result);
+    };
+
+    modal.querySelector('#confirm-ok-btn').addEventListener('click', () => finish(true));
+    modal.querySelector('#confirm-cancel-btn').addEventListener('click', () => finish(false));
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) {
+        finish(false);
+      }
+    });
+    modal.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        finish(false);
+      }
+    });
+
+    modal.querySelector('.error-modal-title').focus();
+  });
+}
+
+/**
  * Close the current error modal
  */
 function closeErrorModal() {
-  if (!currentModal) return;
+  if (!currentModal) {
+    return;
+  }
 
   const { modal, backdrop } = currentModal;
 
@@ -108,8 +191,12 @@ function closeErrorModal() {
   backdrop.classList.add('error-modal-backdrop-dismissing');
 
   setTimeout(() => {
-    if (modal.parentNode) modal.parentNode.removeChild(modal);
-    if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+    if (modal.parentNode) {
+      modal.parentNode.removeChild(modal);
+    }
+    if (backdrop.parentNode) {
+      backdrop.parentNode.removeChild(backdrop);
+    }
     currentModal = null;
   }, 200);
 }

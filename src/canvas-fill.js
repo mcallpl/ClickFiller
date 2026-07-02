@@ -1,6 +1,8 @@
 // Stores current state for save/export
+import { config } from './config.js';
+
 let currentImageUrl = null;
-let savedStateKey = 'clickfiller_result';
+const savedStateKey = config.STORAGE_KEYS.result;
 
 /**
  * Displays the form image with draggable text overlays.
@@ -26,7 +28,9 @@ export function fillFormOnCanvas(canvas, imageDataUrl, fields) {
       requestAnimationFrame(() => {
         setTimeout(() => {
           fields.forEach((field, i) => {
-            if (!field.value) return;
+            if (!field.value) {
+              return;
+            }
             createFieldOverlay(container, resultImg, field, i);
           });
           setupResizeObserver();
@@ -43,11 +47,15 @@ export function fillFormOnCanvas(canvas, imageDataUrl, fields) {
  */
 export function restoreResult() {
   const saved = localStorage.getItem(savedStateKey);
-  if (!saved) return null;
+  if (!saved) {
+    return null;
+  }
 
   try {
     const state = JSON.parse(saved);
-    if (!state.imageUrl || !state.fields) return null;
+    if (!state.imageUrl || !state.fields) {
+      return null;
+    }
 
     currentImageUrl = state.imageUrl;
     const container = document.getElementById('result-form-container');
@@ -103,7 +111,9 @@ export function saveResult() {
       }
     });
     text = text.trim();
-    if (!text) return;
+    if (!text) {
+      return;
+    }
     fields.push({
       value: text,
       label: el.dataset.label || '',
@@ -140,7 +150,7 @@ export function saveResult() {
  * Check if there's a saved result.
  */
 export function hasSavedResult() {
-  return !!localStorage.getItem(savedStateKey);
+  return Boolean(localStorage.getItem(savedStateKey));
 }
 
 /**
@@ -154,13 +164,21 @@ export function clearSavedResult() {
  * Creates a single draggable field overlay positioned by percentage.
  */
 function createFieldOverlay(container, imgEl, field, index) {
+  // Clamp AI-supplied coordinates to the visible range (0-98%, matching the
+  // drag handler). Vision estimates can land slightly outside 0-100%, and the
+  // result container has overflow:hidden — so an unclamped field would be
+  // silently clipped out of both the editor and the exported PDF with no
+  // indication anything is missing.
+  const x = Math.max(0, Math.min(parseFloat(field.x) || 0, 98));
+  const y = Math.max(0, Math.min(parseFloat(field.y) || 0, 98));
+
   const el = document.createElement('div');
   el.className = 'field-overlay';
   el.textContent = field.value;
   el.dataset.index = index;
   el.dataset.label = field.label || '';
-  el.dataset.xPct = field.x;
-  el.dataset.yPct = field.y;
+  el.dataset.xPct = x;
+  el.dataset.yPct = y;
   el.dataset.fontSizePct = field.fontSize || 1.5;
 
   // Mark as editable if it was a custom-added field
@@ -170,8 +188,8 @@ function createFieldOverlay(container, imgEl, field, index) {
   }
 
   // Position using CSS percentages — survives zoom and resize
-  el.style.left = field.x + '%';
-  el.style.top = field.y + '%';
+  el.style.left = x + '%';
+  el.style.top = y + '%';
 
   // Font size: calculate from image display height
   updateFontSize(el, imgEl);
@@ -188,8 +206,12 @@ function addDeleteButton(el) {
   const btn = document.createElement('div');
   btn.className = 'overlay-delete';
   btn.textContent = '✕';
-  btn.addEventListener('mousedown', (e) => { e.stopPropagation(); });
-  btn.addEventListener('touchstart', (e) => { e.stopPropagation(); }, { passive: true });
+  btn.addEventListener('mousedown', (e) => {
+    e.stopPropagation(); 
+  });
+  btn.addEventListener('touchstart', (e) => {
+    e.stopPropagation(); 
+  }, { passive: true });
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
     el.remove();
@@ -205,7 +227,9 @@ function addDeleteButton(el) {
  */
 function deselectAll() {
   const container = document.getElementById('result-form-container');
-  if (!container) return;
+  if (!container) {
+    return;
+  }
   container.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
 }
 
@@ -230,12 +254,16 @@ document.addEventListener('click', (e) => {
 // Keep font sizes correct when the image resizes (zoom, orientation, etc.)
 let resizeObserverSet = false;
 function setupResizeObserver() {
-  if (resizeObserverSet) return;
+  if (resizeObserverSet) {
+    return;
+  }
   resizeObserverSet = true;
 
   const imgEl = document.getElementById('result-image');
   const container = document.getElementById('result-form-container');
-  if (!imgEl || !container) return;
+  if (!imgEl || !container) {
+    return;
+  }
 
   const ro = new ResizeObserver(() => {
     container.querySelectorAll('.field-overlay').forEach(el => {
@@ -278,7 +306,9 @@ function makeDraggable(el, imgEl) {
   }
 
   function onMove(e) {
-    if (!dragging) return;
+    if (!dragging) {
+      return;
+    }
 
     const touch = e.touches ? e.touches[0] : e;
     const dx = touch.clientX - startX;
@@ -345,7 +375,9 @@ function makeDraggable(el, imgEl) {
 export function addTextField() {
   const container = document.getElementById('result-form-container');
   const imgEl = document.getElementById('result-image');
-  if (!container || !imgEl) return;
+  if (!container || !imgEl) {
+    return;
+  }
 
   const el = document.createElement('div');
   el.className = 'field-overlay editable';
@@ -372,7 +404,9 @@ export function addTextField() {
 export function addSignatureOverlay(sigDataUrl) {
   const container = document.getElementById('result-form-container');
   const imgEl = document.getElementById('result-image');
-  if (!container || !imgEl) return;
+  if (!container || !imgEl) {
+    return;
+  }
 
   const wrapper = document.createElement('div');
   wrapper.className = 'sig-overlay';
@@ -452,7 +486,9 @@ function makeResizable(wrapper, handle, imgEl) {
   }
 
   function onMove(e) {
-    if (!resizing) return;
+    if (!resizing) {
+      return;
+    }
     e.preventDefault();
 
     const touch = e.touches ? e.touches[0] : e;
@@ -541,10 +577,14 @@ export function renderToCanvas(canvas) {
       overlays.forEach(el => {
         let text = '';
         el.childNodes.forEach(node => {
-          if (node.nodeType === Node.TEXT_NODE) text += node.textContent;
+          if (node.nodeType === Node.TEXT_NODE) {
+            text += node.textContent;
+          }
         });
         text = text.trim();
-        if (!text) return;
+        if (!text) {
+          return;
+        }
 
         const xPct = parseFloat(el.dataset.xPct);
         const yPct = parseFloat(el.dataset.yPct);
@@ -552,8 +592,8 @@ export function renderToCanvas(canvas) {
         const computedFontSize = parseFloat(window.getComputedStyle(el).fontSize);
         const canvasFontSize = Math.max(computedFontSize * scaleY, 10);
 
-        const fx = (xPct / 100) * w + (1 * scaleX);
-        const fy = (yPct / 100) * h + (1 * scaleY);
+        const fx = (xPct / 100) * w + (Number(scaleX));
+        const fy = (yPct / 100) * h + (Number(scaleY));
 
         ctx.fillStyle = '#000000';
         ctx.font = `${canvasFontSize}px Arial, Helvetica, sans-serif`;
@@ -583,11 +623,15 @@ export function renderToCanvas(canvas) {
           ctx.drawImage(sigImg, sx, sy, sw, sh);
 
           sigsRemaining--;
-          if (sigsRemaining === 0) resolve();
+          if (sigsRemaining === 0) {
+            resolve();
+          }
         };
         sigImg.onerror = () => {
           sigsRemaining--;
-          if (sigsRemaining === 0) resolve();
+          if (sigsRemaining === 0) {
+            resolve();
+          }
         };
         sigImg.src = el.dataset.sigUrl;
       });

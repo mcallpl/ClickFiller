@@ -1,6 +1,7 @@
 import { eventBus } from './event-bus.js';
+import { config } from './config.js';
 
-const SIG_KEY = 'clickfiller_signatures';
+const SIG_KEY = config.STORAGE_KEYS.signatures;
 
 /**
  * Get all saved signatures from localStorage.
@@ -28,8 +29,8 @@ export function addSignature(file) {
     reader.onload = (ev) => {
       const img = new Image();
       img.onload = () => {
-        // Resize to max 400px wide
-        const maxW = 400;
+        // Resize to the configured max signature width
+        const maxW = config.SIGNATURE_MAX_WIDTH;
         let w = img.width;
         let h = img.height;
         if (w > maxW) {
@@ -69,7 +70,9 @@ export function removeSignature(index) {
  */
 export function renderSignatureList() {
   const container = document.getElementById('signature-list');
-  if (!container) return;
+  if (!container) {
+    return;
+  }
   container.innerHTML = '';
 
   const sigs = getSignatures();
@@ -119,7 +122,7 @@ export function pickSignature() {
     const backdrop = document.getElementById('sig-picker-backdrop');
 
     list.innerHTML = '';
-    sigs.forEach((sig, i) => {
+    sigs.forEach((sig) => {
       const btn = document.createElement('button');
       btn.className = 'sig-pick-option';
       btn.innerHTML = `<img src="${sig.dataUrl}" alt="${sig.name}">`;

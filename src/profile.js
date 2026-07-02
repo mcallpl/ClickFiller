@@ -1,8 +1,11 @@
 import { StorageManager } from './storage-manager.js';
+import { config } from './config.js';
 
 export function loadProfile() {
   const data = StorageManager.loadProfile();
-  if (!data) return;
+  if (!data) {
+    return;
+  }
 
   try {
     // Fill standard fields
@@ -58,7 +61,9 @@ export function getProfile() {
     const data = gatherProfileData();
     // Only return form data if there's something in it
     const keys = Object.keys(data).filter(k => k !== '_custom');
-    if (keys.length > 0) return data;
+    if (keys.length > 0) {
+      return data;
+    }
   }
 
   // Fall back to stored data
@@ -97,7 +102,9 @@ function gatherProfileData() {
  */
 export function setupAutoSave() {
   const form = document.getElementById('profile-form');
-  if (!form) return;
+  if (!form) {
+    return;
+  }
 
   let debounceTimer;
   form.addEventListener('input', () => {
@@ -176,22 +183,23 @@ function showProfileWarning(message) {
 }
 
 /**
- * Clear all user data (GDPR right to deletion)
- * Removes: profile data, saved results, signatures, images
+ * Clear all user data (GDPR right to deletion).
+ * Removes: profile data, saved results, signatures, images.
+ * NOTE: This performs the deletion unconditionally. Confirmation is handled by
+ * the UI layer (handleClearAllData) via the app's custom confirm modal, so this
+ * no longer uses the native blocking window.confirm().
+ * @returns {boolean} true if data was cleared successfully
  */
 export function clearAllData() {
-  // Confirm with user
-  const confirmed = window.confirm(
-    'This will permanently delete all your saved data (profile, signatures, forms). This action cannot be undone. Continue?'
-  );
-  if (!confirmed) return false;
-
   try {
     // Clear profile from localStorage
     StorageManager.clearProfile();
 
-    // Clear any saved result image
-    localStorage.removeItem('clickfiller_saved_result');
+    // Clear any saved result (filled form image + field positions, which may
+    // contain PII baked into the overlay text). The correct key is
+    // 'clickfiller_result' — the old code removed a non-existent
+    // 'clickfiller_saved_result' key, so saved results survived deletion.
+    localStorage.removeItem(config.STORAGE_KEYS.result);
 
     // Clear any captured image from session
     const previewImg = document.getElementById('preview-img');
@@ -217,8 +225,8 @@ export function clearAllData() {
       customFields.innerHTML = '';
     }
 
-    // Clear signatures (stored in localStorage as 'clickfiller_signatures')
-    localStorage.removeItem('clickfiller_signatures');
+    // Clear signatures
+    localStorage.removeItem(config.STORAGE_KEYS.signatures);
 
     showProfileWarning('All your data has been deleted. You can now close this browser.');
     return true;

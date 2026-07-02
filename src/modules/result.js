@@ -10,7 +10,6 @@ import {
   renderToCanvas,
   saveResult,
   restoreResult,
-  hasSavedResult,
   addTextField,
   addSignatureOverlay,
 } from '../canvas-fill.js';

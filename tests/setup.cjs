@@ -22,9 +22,13 @@ Object.defineProperty(global, 'localStorage', {
   writable: true,
 });
 
-// Reset mocks before each test
+// Reset mocks before each test.
+// NOTE: use resetAllMocks (not clearAllMocks) — clearAllMocks only clears call
+// records, leaving `mockResolvedValueOnce`/`mockReturnValueOnce` values queued.
+// Those leaked between tests (e.g. a queued `{fields: []}` fetch response from
+// one test surfaced in the next), causing order-dependent failures.
 beforeEach(() => {
-  jest.clearAllMocks();
+  jest.resetAllMocks();
   localStorageMock.getItem.mockReturnValue(null);
 });
 

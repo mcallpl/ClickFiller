@@ -23,7 +23,7 @@ describe('End-to-End: Complete Workflow', () => {
       const userInfo = VALID_PROFILE;
 
       // STEP 3: User saves profile
-      let result = StorageManager.saveProfile(userInfo);
+      const result = StorageManager.saveProfile(userInfo);
       expect(result.success).toBe(true);
 
       // STEP 4: Verify profile was saved
@@ -166,7 +166,7 @@ describe('End-to-End: Complete Workflow', () => {
 
       // Clear mock and retry
       localStorage.setItem.mockClear();
-      localStorage.setItem.mockImplementation((key, value) => {
+      localStorage.setItem.mockImplementation(() => {
         // Success
       });
 

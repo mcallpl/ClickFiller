@@ -48,7 +48,6 @@ export class StorageManager {
 
     try {
       localStorage.setItem(STORAGE_KEY, json);
-      console.log('Profile saved successfully');
       return { success: true };
     } catch (e) {
       console.error('localStorage save failed:', e);
@@ -66,7 +65,9 @@ export class StorageManager {
   static loadProfile() {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (!saved) return null;
+      if (!saved) {
+        return null;
+      }
       return JSON.parse(saved);
     } catch (e) {
       console.error('Failed to load profile:', e);
@@ -88,7 +89,6 @@ export class StorageManager {
   static clearProfile() {
     try {
       localStorage.removeItem(STORAGE_KEY);
-      console.log('Profile cleared');
     } catch (e) {
       console.error('Failed to clear profile:', e);
     }

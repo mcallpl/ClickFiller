@@ -3,6 +3,8 @@
  * Handles resizing, compression, format detection, and optimization for API calls.
  */
 
+import { config } from './config.js';
+
 /**
  * Get image dimensions from a data URL
  * @param {string} dataUrl - Data URL of the image
@@ -27,19 +29,25 @@ export function getImageDimensions(dataUrl) {
  * @returns {string} Format type: 'jpeg', 'png', 'webp', or 'unknown'
  */
 export function detectFormat(dataUrl) {
-  if (dataUrl.startsWith('data:image/jpeg')) return 'jpeg';
-  if (dataUrl.startsWith('data:image/png')) return 'png';
-  if (dataUrl.startsWith('data:image/webp')) return 'webp';
+  if (dataUrl.startsWith('data:image/jpeg')) {
+    return 'jpeg';
+  }
+  if (dataUrl.startsWith('data:image/png')) {
+    return 'png';
+  }
+  if (dataUrl.startsWith('data:image/webp')) {
+    return 'webp';
+  }
   return 'unknown';
 }
 
 /**
  * Resize image to a maximum dimension, maintaining aspect ratio
  * @param {string} dataUrl - Data URL of the image
- * @param {number} maxDim - Maximum width or height (default: 1024)
+ * @param {number} maxDim - Maximum width or height (default: config.IMAGE_RESIZE_MAX_DIM)
  * @returns {Promise<string>} Resized image as data URL (JPEG)
  */
-export function resizeImage(dataUrl, maxDim = 1024) {
+export function resizeImage(dataUrl, maxDim = config.IMAGE_RESIZE_MAX_DIM) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
@@ -64,7 +72,7 @@ export function resizeImage(dataUrl, maxDim = 1024) {
       ctx.drawImage(img, 0, 0, w, h);
 
       try {
-        resolve(canvas.toDataURL('image/jpeg', 0.85));
+        resolve(canvas.toDataURL('image/jpeg', config.IMAGE_JPEG_QUALITY));
       } catch (err) {
         reject(err);
       }
@@ -119,7 +127,7 @@ function getDataUrlSize(dataUrl) {
 
 /**
  * Optimize image for API call with progressive compression
- * Resizes to max 1024px, then applies progressive compression if needed
+ * Resizes to config.IMAGE_RESIZE_MAX_DIM, then applies progressive compression if needed
  * @param {string} dataUrl - Data URL of the image
  * @param {number} maxSizeMB - Maximum acceptable size in MB (default: 20)
  * @returns {Promise<{dataUrl: string, width: number, height: number, quality: number}>}
@@ -127,8 +135,8 @@ function getDataUrlSize(dataUrl) {
 export async function optimizeForAPI(dataUrl, maxSizeMB = 20) {
   const maxSizeBytes = maxSizeMB * 1024 * 1024;
 
-  // Step 1: Resize to max 1024px
-  let optimized = await resizeImage(dataUrl, 1024);
+  // Step 1: Resize to the configured max dimension
+  let optimized = await resizeImage(dataUrl, config.IMAGE_RESIZE_MAX_DIM);
   const dims = await getImageDimensions(optimized);
 
   // Step 2: Check size and apply progressive compression if needed
@@ -150,7 +158,7 @@ export async function optimizeForAPI(dataUrl, maxSizeMB = 20) {
   if (sizeBytes > maxSizeBytes) {
     throw new Error(
       `Image is too large (${(sizeBytes / (1024 * 1024)).toFixed(1)}MB). ` +
-      `Please try with a smaller or lower-resolution image.`
+      'Please try with a smaller or lower-resolution image.',
     );
   }
 

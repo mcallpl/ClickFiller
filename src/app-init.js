@@ -9,9 +9,6 @@ import { stateManager } from './state.js';
  * Initialize the app
  */
 export function initializeApp() {
-  // Initialize any global setup here
-  console.log('ClickFiller app initializing...');
-
   // Subscribe to state changes for debugging (can be removed in production)
   if (process.env.DEBUG) {
     stateManager.subscribe((path, newValue, oldValue) => {
@@ -27,6 +24,4 @@ export function initializeApp() {
       return originalEmit(event, data);
     };
   }
-
-  console.log('ClickFiller app initialized');
 }

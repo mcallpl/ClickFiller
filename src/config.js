@@ -52,11 +52,15 @@ export const config = {
     storageFull: 'could not save — storage may be full. Try clearing old data.',
   },
 
-  // Image Processing
-  IMAGE_RESIZE_MAX_DIM: 1200,
-  IMAGE_JPEG_QUALITY: 0.75,
+  // Image Processing.
+  // These are now the single source of truth actually read by
+  // image-processor.js. The values match the app's real runtime behavior
+  // (previously these were 1200 / 0.75 but were never referenced, so the code's
+  // hardcoded 1024 / 0.85 were what actually ran). Edit here to change resizing.
+  IMAGE_RESIZE_MAX_DIM: 1024,
+  IMAGE_JPEG_QUALITY: 0.85,
 
-  // Signature Processing
+  // Signature Processing (read by signatures.js)
   SIGNATURE_MAX_WIDTH: 400,
 
   // View Names

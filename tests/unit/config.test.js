@@ -340,7 +340,6 @@ describe('Configuration Module', () => {
     it('config object should be frozen or sealed', () => {
       // Note: This test checks if config is properly protected
       // Current implementation may or may not freeze config
-      const descriptor = Object.getOwnPropertyDescriptor(config, 'API_ANALYZE_URL');
       // Just verify config structure is consistent
       expect(config.API_ANALYZE_URL).toBe('/api/analyze');
     });
