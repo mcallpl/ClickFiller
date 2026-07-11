@@ -272,9 +272,13 @@ export function validateProfile(data) {
         return;
       }
 
-      // Custom field label: max 50 chars, letters/numbers/spaces/hyphens
-      if (field.label.length > 50 || !/^[a-zA-Z0-9\s-]+$/.test(field.label)) {
-        errors[`_custom_label_${idx}`] = 'Custom field name must be max 50 characters, letters/numbers/spaces/hyphens only';
+      // Custom field label: max 50 chars. Allow the punctuation that appears
+      // in real printed form labels — parentheses, comma, period, slash, hash,
+      // ampersand, apostrophe, colon, asterisk — so a legitimate label like
+      // "Weight (lb)" or "Policy #" never fails the save. Still rejects markup
+      // and injection characters (@, <, >, {, }, etc.).
+      if (field.label.length > 50 || !/^[a-zA-Z0-9\s\-().,/#&':*]+$/.test(field.label)) {
+        errors[`_custom_label_${idx}`] = 'Custom field name must be max 50 characters; letters, numbers, spaces and basic punctuation only';
       }
 
       // Custom field value: max 100 chars

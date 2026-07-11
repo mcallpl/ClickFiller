@@ -277,13 +277,38 @@ async function handleFillForm() {
 }
 
 /**
+ * Turn a raw form label from the AI (e.g. "WEIGHT (lb)", "BIRTHDATE *
+ * (MM/DD/YYYY)") into a clean, storable custom-field name ("Weight",
+ * "Birthdate"). Parenthetical hints and stray punctuation are dropped so the
+ * saved name passes profile validation and matches cleanly on future forms.
+ * @param {string} raw - the AI's field label
+ * @returns {string} a tidy field name, or '' if nothing usable remains
+ */
+function normalizeFieldLabel(raw) {
+  return String(raw)
+    .replace(/\([^)]*\)/g, ' ')                  // drop parenthetical hints
+    .replace(/[*:]/g, ' ')                        // drop asterisks / colons
+    .replace(/[^a-zA-Z0-9\s\-&'#]/g, ' ')         // strip other punctuation
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase())     // Title Case for tidiness
+    .slice(0, 50)
+    .trim();
+}
+
+/**
  * Save user-provided answers for missing fields into the profile as custom
  * fields (updating an existing row if the label already exists), so the app
  * never has to ask for the same information twice.
  * @param {Object} answers - map of label -> value
  */
 function saveAnswersToProfile(answers) {
-  Object.entries(answers).forEach(([label, value]) => {
+  Object.entries(answers).forEach(([rawLabel, value]) => {
+    const label = normalizeFieldLabel(rawLabel);
+    if (!label) {
+      return;
+    }
+
     let existingRow = null;
     document.querySelectorAll(`.${config.CLASS_NAMES.customFieldRow}`).forEach(row => {
       const rowLabel = row.querySelector(`.${config.CLASS_NAMES.customLabel}`);

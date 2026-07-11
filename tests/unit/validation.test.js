@@ -419,6 +419,32 @@ describe('Validation Module', () => {
       expect(result.valid).toBe(false);
     });
 
+    it('should accept form-style custom labels with punctuation', () => {
+      // Labels auto-saved from AI-detected form fields routinely contain
+      // parentheses, commas, slashes, etc. These must NOT fail the save
+      // (regression: they were rejected, discarding the whole profile).
+      const labels = ['Weight (lb)', 'Height (e.g., 5 ft 10 in)', 'Policy #', 'Date (MM/DD/YYYY)'];
+      labels.forEach((label) => {
+        const result = validateProfile({ _custom: [{ label, value: 'x' }] });
+        expect(result.valid).toBe(true);
+      });
+    });
+
+    it('should not discard a valid custom field because another is invalid', () => {
+      // The reported bug: one bad label failed the entire save. With label
+      // normalization upstream, saved labels are clean; but even mixed input
+      // must only flag the bad one, not claim the whole profile is invalid
+      // for the good field.
+      const result = validateProfile({
+        _custom: [
+          { label: 'Shoe Size', value: '10.5' },
+          { label: 'Bad@Label', value: 'x' },
+        ],
+      });
+      expect(result.errors._custom_label_0).toBeUndefined();
+      expect(result.errors._custom_label_1).toBeDefined();
+    });
+
     it('should reject custom field value over 100 chars', () => {
       const profile = {
         firstName: 'Test',
