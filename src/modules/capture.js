@@ -6,9 +6,10 @@ import { PerspectiveCrop } from '../perspective-crop.js';
 import { config } from '../config.js';
 import { eventBus } from '../event-bus.js';
 import { stateManager } from '../state.js';
-import { getProfile } from '../profile.js';
+import { getProfile, saveProfile } from '../profile.js';
 import { showLoadingOverlay, updateLoadingOverlay, dismissLoadingOverlay } from './ui-utils.js';
 import { optimizeForAPI, getImageDimensions } from '../image-processor.js';
+import { askForMissingFields } from '../components/missing-fields-modal.js';
 
 let cameraInput = null;
 let fileInput = null;
@@ -205,7 +206,7 @@ async function handleFillForm() {
   stateManager.setState('isProcessing', true);
 
   // Show loading overlay with progress
-  const loadingOverlay = showLoadingOverlay(
+  let loadingOverlay = showLoadingOverlay(
     'Analyzing form and filling fields...',
     'Step 1/3: Detecting form fields...',
   );
@@ -215,7 +216,35 @@ async function handleFillForm() {
     updateLoadingOverlay(loadingOverlay, 'Analyzing form and filling fields...', 'Step 2/3: Matching your data...');
     const result = await analyzeAndFill(imageData, profile);
 
-    if (!result.fields || result.fields.length === 0) {
+    const fields = result.fields || [];
+    const missing = result.missingFields || [];
+    if (fields.length === 0 && missing.length === 0) {
+      throw new Error(config.MESSAGES.noFieldsDetected);
+    }
+
+    // The AI found fields the profile has no data for — ask the user now,
+    // save the answers to the profile, and place them like any other field.
+    if (missing.length > 0) {
+      dismissLoadingOverlay(loadingOverlay);
+      const answers = await askForMissingFields(missing);
+      loadingOverlay = showLoadingOverlay(
+        'Analyzing form and filling fields...',
+        'Step 3/3: Positioning text...',
+      );
+
+      const answeredLabels = Object.keys(answers);
+      if (answeredLabels.length > 0) {
+        saveAnswersToProfile(answers);
+        missing.forEach(f => {
+          const value = answers[f.label.trim()];
+          if (value) {
+            fields.push({ ...f, value });
+          }
+        });
+      }
+    }
+
+    if (fields.length === 0) {
       throw new Error(config.MESSAGES.noFieldsDetected);
     }
 
@@ -225,7 +254,7 @@ async function handleFillForm() {
     // Emit event for result module to handle
     eventBus.emit('form:analyzing-complete', {
       imageData,
-      fields: result.fields,
+      fields,
     });
   } catch (err) {
     console.error('Fill error:', err);
@@ -240,6 +269,32 @@ async function handleFillForm() {
     fillBtn.disabled = false;
     dismissLoadingOverlay(loadingOverlay);
   }
+}
+
+/**
+ * Save user-provided answers for missing fields into the profile as custom
+ * fields (updating an existing row if the label already exists), so the app
+ * never has to ask for the same information twice.
+ * @param {Object} answers - map of label -> value
+ */
+function saveAnswersToProfile(answers) {
+  Object.entries(answers).forEach(([label, value]) => {
+    let existingRow = null;
+    document.querySelectorAll(`.${config.CLASS_NAMES.customFieldRow}`).forEach(row => {
+      const rowLabel = row.querySelector(`.${config.CLASS_NAMES.customLabel}`);
+      if (rowLabel && rowLabel.value.trim().toLowerCase() === label.toLowerCase()) {
+        existingRow = row;
+      }
+    });
+
+    if (existingRow) {
+      existingRow.querySelector(`.${config.CLASS_NAMES.customValue}`).value = value;
+    } else if (typeof window.addCustomFieldRow === 'function') {
+      window.addCustomFieldRow(label, value);
+    }
+  });
+
+  saveProfile();
 }
 
 /**

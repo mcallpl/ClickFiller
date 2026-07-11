@@ -57,7 +57,9 @@ export const config = {
   // image-processor.js. The values match the app's real runtime behavior
   // (previously these were 1200 / 0.75 but were never referenced, so the code's
   // hardcoded 1024 / 0.85 were what actually ran). Edit here to change resizing.
-  IMAGE_RESIZE_MAX_DIM: 1024,
+  // 1536 (up from 1024) so small form labels stay legible to the vision model —
+  // sharper input directly improves field-position accuracy.
+  IMAGE_RESIZE_MAX_DIM: 1536,
   IMAGE_JPEG_QUALITY: 0.85,
 
   // Signature Processing (read by signatures.js)

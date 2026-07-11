@@ -79,8 +79,8 @@ app.post('/api/analyze', validateAnalyzeRequest, async (req, res) => {
   console.log('[POST /api/analyze] Starting form analysis');
 
   try {
-    const { image, profile } = req.body;
-    const result = await analyzeForm(image, profile);
+    const { image, profile, imageWidth, imageHeight } = req.body;
+    const result = await analyzeForm(image, profile, { imageWidth, imageHeight });
 
     console.log('[POST /api/analyze] Analysis successful, returning result');
     res.json(result);

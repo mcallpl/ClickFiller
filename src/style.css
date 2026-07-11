@@ -531,6 +531,79 @@ nav {
   touch-action: none;
 }
 
+/* Missing fields modal — asks for form data not in the profile */
+#missing-fields-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 250;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.missing-fields-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.6);
+}
+
+.missing-fields-content {
+  position: relative;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 20px;
+  max-width: 380px;
+  width: 92%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.missing-fields-content h3 {
+  margin-bottom: 8px;
+  font-size: 18px;
+}
+
+.missing-fields-subtitle {
+  font-size: 13px;
+  color: var(--text-dim, #aaa);
+  margin-bottom: 14px;
+  line-height: 1.4;
+}
+
+.missing-field-row {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.missing-field-row span {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.missing-field-row input {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--surface-light);
+  background: var(--bg);
+  color: inherit;
+  font-size: 15px;
+}
+
+.missing-fields-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
 /* Signature picker modal */
 #sig-picker {
   position: fixed;
