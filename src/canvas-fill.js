@@ -551,17 +551,42 @@ export function renderToCanvas(canvas) {
       canvas.height = h;
       const ctx = canvas.getContext('2d');
 
-      // Draw the form image, then lighten it and push near-white to pure white
+      // Draw the form image, then normalize the paper to white WITHOUT
+      // destroying the form's structure. The old approach (+80 on every
+      // pixel) erased light-gray input-box borders and section shading,
+      // exporting text floating on a blank page. Instead: estimate the
+      // paper's brightness from the luminance histogram (on a form, paper
+      // is the dominant bright mass) and scale so paper maps to pure white.
+      // Dark strokes — printed labels, box borders, lines — keep their
+      // contrast; photo gray/shadow lifts to clean white.
       ctx.drawImage(img, 0, 0, w, h);
       const imageData = ctx.getImageData(0, 0, w, h);
       const d = imageData.data;
+
+      const hist = new Uint32Array(256);
       for (let i = 0; i < d.length; i += 4) {
-        // Lighten all pixels
-        d[i]     = Math.min(255, d[i] + 80);     // R
-        d[i + 1] = Math.min(255, d[i + 1] + 80); // G
-        d[i + 2] = Math.min(255, d[i + 2] + 80); // B
-        // If close to white, snap to pure white
-        if (d[i] > 220 && d[i + 1] > 220 && d[i + 2] > 220) {
+        hist[(d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) | 0]++;
+      }
+      // Paper white = median luminance (most of a form is paper). Floor at
+      // 170 so a dark or mostly-graphic image is never blown out (max ~1.5x).
+      const totalPx = d.length / 4;
+      let acc = 0;
+      let paperWhite = 255;
+      for (let v = 255; v >= 0; v--) {
+        acc += hist[v];
+        if (acc >= totalPx / 2) {
+          paperWhite = v;
+          break;
+        }
+      }
+      const scale = 255 / Math.max(paperWhite, 170);
+
+      for (let i = 0; i < d.length; i += 4) {
+        d[i]     = Math.min(255, d[i] * scale);
+        d[i + 1] = Math.min(255, d[i + 1] * scale);
+        d[i + 2] = Math.min(255, d[i + 2] * scale);
+        // Snap only true near-white to white (residual paper texture)
+        if (d[i] > 245 && d[i + 1] > 245 && d[i + 2] > 245) {
           d[i] = 255;
           d[i + 1] = 255;
           d[i + 2] = 255;

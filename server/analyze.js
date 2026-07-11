@@ -107,6 +107,12 @@ For EVERY fillable input area on the form, output:
 - "box_2d": the bounding box of the EMPTY WRITING AREA in [ymin, xmin, ymax, xmax] format, with coordinates normalized to 0-1000
 - "value": the user's data to write there. If none of the user's data matches this field, return the field anyway with "value" set to "" (empty string) — the app will ask the user for it.
 
+STRICT MATCHING — a wrong value is far worse than an empty one:
+- Only fill a field if the user's data means the same thing as the field's label. Same TYPE is not enough.
+- NEVER reuse the date of birth for any other date field ("Today's Date", "Date Signed", "Test Date", "Appointment Date" — those get "" unless the user's data explicitly provides them).
+- NEVER put a phone number in a fax/work-phone field, a home address in an employer/emergency-contact address, or the user's name in a witness/physician/emergency-contact name field.
+- When unsure whether data matches a field, leave "value" as "" and let the app ask the user.
+
 CRITICAL — what the box must cover:
 - The box is the BLANK space where a person would handwrite the answer: the empty area above a blank line, inside an empty box, or inside a table cell.
 - Do NOT include the printed label in the box. If the form says "Name: ________", the box starts immediately AFTER the colon, at the beginning of the blank line, and ends at the end of the line.
