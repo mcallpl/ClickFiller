@@ -4,8 +4,8 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import rateLimit from 'express-rate-limit';
-import { analyzeForm } from './analyze.js';
-import { validateAnalyzeRequest } from './middleware/validation.js';
+import { analyzeForm, locateCheckbox } from './analyze.js';
+import { validateAnalyzeRequest, validateLocateRequest } from './middleware/validation.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -95,6 +95,27 @@ app.get('/health', (req, res) => {
 });
 
 // Form analysis endpoint with request validation
+// Focused checkbox locator: small strip image + one label. Cheaper and more
+// frequent than /api/analyze (one call per checkbox), so a higher limit.
+const locateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please wait a moment and try again.' },
+});
+
+app.post('/api/locate', locateLimiter, validateLocateRequest, async (req, res) => {
+  try {
+    const { image, label } = req.body;
+    res.json(await locateCheckbox(image, label));
+  } catch (err) {
+    const statusCode = err.statusCode || 500;
+    console.error(`[POST /api/locate] Error (${statusCode}): ${err.message}`);
+    res.status(statusCode).json({ error: err.message || 'Failed to locate checkbox' });
+  }
+});
+
 app.post('/api/analyze', analyzeLimiter, validateAnalyzeRequest, async (req, res) => {
   console.log('[POST /api/analyze] Starting form analysis');
 

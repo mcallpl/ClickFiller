@@ -31,6 +31,15 @@ const RESPONSE_SCHEMA = {
             minItems: 4,
             maxItems: 4,
           },
+          // For checkboxes only: the bounding box of the option's printed
+          // label text. Models locate text far more reliably than tiny empty
+          // squares, so the client uses this to find the right square.
+          label_box_2d: {
+            type: Type.ARRAY,
+            items: { type: Type.INTEGER },
+            minItems: 4,
+            maxItems: 4,
+          },
           value: { type: Type.STRING },
         },
         required: ['label', 'box_2d', 'value'],
@@ -61,6 +70,70 @@ async function generateWithRetry(request, maxAttempts = 4) {
     }
   }
   throw lastErr;
+}
+
+// Schema for the focused checkbox-location query.
+const LOCATE_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    found: { type: Type.BOOLEAN },
+    box_2d: {
+      type: Type.ARRAY,
+      items: { type: Type.INTEGER },
+      minItems: 4,
+      maxItems: 4,
+    },
+  },
+  required: ['found', 'box_2d'],
+};
+
+/**
+ * Focused second look for a single checkbox. The client sends a narrow strip
+ * of the form (just the row in question) — with the square large relative to
+ * the image and one precise question, localization is far more reliable than
+ * on the full page.
+ */
+export async function locateCheckbox(imageDataUrl, label) {
+  if (!process.env.GEMINI_API_KEY) {
+    const keyError = new Error('Server is missing GEMINI_API_KEY.');
+    keyError.statusCode = 500;
+    throw keyError;
+  }
+  const base64Match = imageDataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
+  if (!base64Match) {
+    const err = new Error('Invalid image data');
+    err.statusCode = 400;
+    throw err;
+  }
+  // Sanitize the label before embedding it in the prompt.
+  const clean = String(label).replace(/[\r\n\t"]/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 120);
+
+  const response = await generateWithRetry({
+    model: MODEL,
+    contents: [{
+      role: 'user',
+      parts: [
+        { inlineData: { mimeType: base64Match[1], data: base64Match[2] } },
+        { text: `This is a narrow strip cut from a paper form. Find the small empty checkbox SQUARE that belongs to the option labeled "${clean}" — the square immediately to the LEFT of that printed text. Return box_2d = [ymin, xmin, ymax, xmax] of the SQUARE ONLY (not the text), normalized to 0-1000 relative to THIS image. If you cannot see it, return found=false.` },
+      ],
+    }],
+    config: {
+      temperature: 0,
+      mediaResolution: 'MEDIA_RESOLUTION_HIGH',
+      maxOutputTokens: 8192,
+      thinkingConfig: { thinkingBudget: 512 },
+      responseMimeType: 'application/json',
+      responseSchema: LOCATE_SCHEMA,
+    },
+  });
+
+  try {
+    const parsed = JSON.parse(response.text.match(/\{[\s\S]*\}/)[0]);
+    const box = Array.isArray(parsed.box_2d) ? parsed.box_2d.map((n) => Math.max(0, Math.min(parseFloat(n) || 0, 1000))) : null;
+    return { found: Boolean(parsed.found) && Boolean(box), box_2d: box };
+  } catch {
+    return { found: false, box_2d: null };
+  }
 }
 
 export async function analyzeForm(imageDataUrl, profile, dims = {}) {
@@ -122,7 +195,7 @@ CRITICAL — what the box must cover:
 - Do NOT include the printed label in the box. If the form says "Name: ________", the box starts immediately AFTER the colon, at the beginning of the blank line, and ends at the end of the line.
 - The box's bottom edge (ymax) sits ON the answer line / underline. The box's top edge (ymin) is one text-line height above it.
 - For an empty rectangle/cell, the box is the interior of that rectangle.
-- For a checkbox that should be checked, the box is EXACTLY the small checkbox square itself (not its label text) and the value is "X".
+- For a checkbox that should be checked, the box is EXACTLY the small checkbox square itself (not its label text), the value is "X", and ALSO return label_box_2d = the bounding box of that option's printed label text (e.g. the words "S corporation"). Getting the RIGHT option among several side-by-side checkboxes is critical.
 - For a segmented/comb field (a row of small boxes, one character per box — e.g. SSN or EIN cells), box the ENTIRE row of cells and put the full value (with any dashes) in "value"; the app splits it into the cells.
 
 Accuracy matters more than quantity:
@@ -263,6 +336,14 @@ Accuracy matters more than quantity:
           // border. 0.4em is a height measure; convert to a width-% via aspect.
           const leftInsetPct = Math.min(fontSize * 0.4 * aspect, boxW * 0.5);
 
+          // Checkbox label text box (same axis order as box_2d), if provided.
+          let labelBox = null;
+          if (Array.isArray(f.label_box_2d) && f.label_box_2d.length === 4) {
+            const lb = f.label_box_2d.map((n) => clamp(n, 0, 1000));
+            const [lyMin, lxMin, lyMax, lxMax] = yFirst ? lb : [lb[1], lb[0], lb[3], lb[2]];
+            labelBox = { x0: lxMin / 10, y0: lyMin / 10, x1: lxMax / 10, y1: lyMax / 10 };
+          }
+
           return {
             label: f.label || '',
             value,
@@ -276,6 +357,7 @@ Accuracy matters more than quantity:
             // lines/borders — the AI box is a good estimate, the ink on the
             // page is ground truth.
             box: { x0: xMin, y0: yMin, x1: xMax, y1: yMax },
+            labelBox,
           };
         });
 

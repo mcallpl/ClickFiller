@@ -1,3 +1,20 @@
+export function validateLocateRequest(req, res, next) {
+  if (!req.body || typeof req.body !== 'object') {
+    return res.status(400).json({ error: 'Request body is required and must be JSON' });
+  }
+  const { image, label } = req.body;
+  if (!image || typeof image !== 'string' || !image.startsWith('data:image/')) {
+    return res.status(400).json({ error: 'Missing or invalid image data (must be a data:image/* URL)' });
+  }
+  if (image.length > 8 * 1024 * 1024) {
+    return res.status(400).json({ error: 'Image strip too large (max ~6MB)' });
+  }
+  if (!label || typeof label !== 'string' || label.length > 200) {
+    return res.status(400).json({ error: 'Missing or invalid label (string, max 200 chars)' });
+  }
+  next();
+}
+
 export function validateAnalyzeRequest(req, res, next) {
   // Check the body FIRST, before destructuring. Destructuring a null/undefined
   // req.body throws a TypeError, which previously crashed this middleware

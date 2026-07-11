@@ -33,7 +33,7 @@ const DOTTED_SPAN = 0.7;
 const COLLISION_INK = 0.012;
 const CHECK_VALUE = /^[xX✓✗]$/;
 
-export async function refinePlacements(imageDataUrl, fields) {
+export async function refinePlacements(imageDataUrl, fields, opts = {}) {
   const img = await loadImage(imageDataUrl);
   const scale = Math.min(1, ANALYSIS_MAX_DIM / Math.max(img.width, img.height));
   const w = Math.max(1, Math.round(img.width * scale));
@@ -45,6 +45,7 @@ export async function refinePlacements(imageDataUrl, fields) {
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   ctx.drawImage(img, 0, 0, w, h);
 
+  const locate = opts.locate || defaultLocate;
   const placed = [];
   for (const field of fields) {
     if (!field || !field.box) {
@@ -52,13 +53,29 @@ export async function refinePlacements(imageDataUrl, fields) {
       continue;
     }
     try {
-      const refined = refineField(ctx, w, h, field);
+      const refined = await refineField(ctx, w, h, field, locate);
       placed.push(...(Array.isArray(refined) ? refined : [refined]));
     } catch {
       placed.push(field);
     }
   }
   return placed;
+}
+
+/**
+ * Default focused-locate transport: asks the backend to find one checkbox
+ * square in a strip of the form. Injectable for tests.
+ */
+async function defaultLocate(stripDataUrl, label) {
+  const response = await fetch('/api/locate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image: stripDataUrl, label }),
+  });
+  if (!response.ok) {
+    return null;
+  }
+  return response.json();
 }
 
 function loadImage(dataUrl) {
@@ -164,20 +181,22 @@ function findHRules(region, x0, x1, y0, y1) {
   return bands;
 }
 
-/** Vertical rules between rows y0..y1 within columns x0..x1. */
+/** Vertical rules between rows y0..y1 within columns x0..x1. Tolerates
+ *  1px anti-aliasing wobble (checks the neighbor column) and slightly broken
+ *  lines, common in photos and thin comb-cell dividers. */
 function findVRules(region, x0, x1, y0, y1) {
-  const { isDark } = region;
+  const { isDark, rw } = region;
   const height = Math.max(1, y1 - y0 + 1);
   const bands = [];
   let run = null;
   for (let x = Math.max(0, x0); x <= x1; x++) {
     let dark = 0;
     for (let y = y0; y <= y1; y++) {
-      if (isDark(x, y)) {
+      if (isDark(x, y) || (x + 1 < rw && isDark(x + 1, y))) {
         dark++;
       }
     }
-    if (dark / height >= 0.55) {
+    if (dark / height >= 0.45) {
       if (!run) {
         run = { left: x, right: x };
       } else {
@@ -257,7 +276,7 @@ function textWidth(value, fontPx) {
   return value.length * 0.52 * fontPx;
 }
 
-function refineField(ctx, w, h, field) {
+async function refineField(ctx, w, h, field, locate) {
   const value = String(field.value || '').trim();
   if (!value) {
     return field;
@@ -265,7 +284,7 @@ function refineField(ctx, w, h, field) {
 
   // ---- Checkbox: find the real square, center the X in it ----------------
   if (CHECK_VALUE.test(value)) {
-    return refineCheckbox(ctx, w, h, field);
+    return refineCheckbox(ctx, w, h, field, locate);
   }
 
   const boxHpx = ((field.box.y1 - field.box.y0) / 100) * h;
@@ -312,17 +331,24 @@ function refineField(ctx, w, h, field) {
     bands.push({ top: boxTopInWin, bottom: Math.min(rh - 1, boxBottomInWin) });
   }
 
-  // Pick the band that overlaps the AI box most; ties go to the taller band.
-  // If nothing overlaps (box sat on a label line above the row), take the
-  // first band below the box top.
-  let band = null;
-  let bestOverlap = -1;
-  for (const b of bands) {
-    const overlap = Math.min(b.bottom, boxBottomInWin) - Math.max(b.top, boxTopInWin);
-    const score = overlap + (b.bottom - b.top) * 0.01;
-    if (score > bestOverlap) {
-      bestOverlap = score;
-      band = b;
+  // Pick the writing band. Primary signal: the band containing the AI box's
+  // TOP — a field's box starts at its printed label, and the label lives in
+  // the field's own row (an overlap score can tie across the row boundary
+  // when the box straddles it, landing text in the NEXT row's field).
+  // Fall back to max overlap when the top band is too thin to write in.
+  let band = bands.find((b) => boxTopInWin >= b.top - 1 && boxTopInWin <= b.bottom) || null;
+  if (band && (band.bottom - band.top) < fontPx0 * 1.1) {
+    band = null;
+  }
+  if (!band) {
+    let bestOverlap = -1;
+    for (const b of bands) {
+      const overlap = Math.min(b.bottom, boxBottomInWin) - Math.max(b.top, boxTopInWin);
+      const score = overlap + (b.bottom - b.top) * 0.01;
+      if (score > bestOverlap) {
+        bestOverlap = score;
+        band = b;
+      }
     }
   }
   if (!band) {
@@ -502,20 +528,109 @@ function tryCombSplit(region, w, h, field, value, bandTop, bandBottom, inX0, inX
 }
 
 /**
- * Checkbox: find the small square outline nearest the AI's box and center
- * the mark inside it. Squares are too short to register as page "rules", so
- * this uses a dedicated detector: matching pairs of short horizontal dark
- * runs (top and bottom edges) connected by dark verticals at both ends.
+ * Checkbox: place an X centered in the correct square.
+ *
+ * Full-page AI localization of tiny empty squares is unreliable (observed
+ * ~30%-of-page misses), so this works through a chain of target points and
+ * pixel-verifies each with a dedicated square detector:
+ *   1. FOCUSED LOOK — crop just this row of the form and ask the backend to
+ *      find "the square left of the printed label"; with the square large
+ *      relative to the strip, localization is far more accurate.
+ *   2. The AI's label-text box (text localization beats square localization).
+ *   3. The AI's original square estimate.
+ * The X is only ever drawn where the pixel detector confirms an actual
+ * square outline; otherwise the AI placement stands.
  */
-function refineCheckbox(ctx, w, h, field) {
+async function refineCheckbox(ctx, w, h, field, locate) {
   const boxHpx = ((field.box.y1 - field.box.y0) / 100) * h;
   const boxWpx = ((field.box.x1 - field.box.x0) / 100) * w;
-  // Wide search: the AI's checkbox estimate can be off by more than the box.
-  const pad = Math.max(12, Math.max(boxHpx, boxWpx) * 2.5);
-  const region = analyzeRegion(ctx, w, h, field.box, pad, pad);
-  const { sx0, sy0, rw, rh, isDark } = region;
+  const sizeHint = Math.max(8, Math.min(boxHpx, boxWpx, 40));
+  const targets = [];
 
-  // Collect short horizontal dark runs (candidate square edges).
+  // 1) Focused strip query (the strongest signal).
+  if (locate && field.label) {
+    try {
+      const stripTopPct = Math.max(0, field.box.y0 - 2.5);
+      const stripBotPct = Math.min(100, field.box.y1 + 2.5);
+      const syPx = Math.floor((stripTopPct / 100) * h);
+      const shPx = Math.max(8, Math.ceil(((stripBotPct - stripTopPct) / 100) * h));
+      const strip = document.createElement('canvas');
+      strip.width = w;
+      strip.height = shPx;
+      strip.getContext('2d').drawImage(ctx.canvas, 0, syPx, w, shPx, 0, 0, w, shPx);
+      const res = await locate(strip.toDataURL('image/png'), field.label);
+      if (res && res.found && Array.isArray(res.box_2d)) {
+        const b = res.box_2d;
+        const aiCy = (((field.box.y0 + field.box.y1) / 2) / 100) * h;
+        // Axis order can't be voted on a single box — try both readings, and
+        // also cross x-from-locate with y-from-the-AI-box (the strip answer's
+        // x tends to be excellent while its y within the strip can be sloppy).
+        targets.push({
+          x: ((b[1] + b[3]) / 2 / 1000) * w,
+          y: syPx + ((b[0] + b[2]) / 2 / 1000) * shPx,
+        });
+        targets.push({ x: ((b[1] + b[3]) / 2 / 1000) * w, y: aiCy });
+        targets.push({
+          x: ((b[0] + b[2]) / 2 / 1000) * w,
+          y: syPx + ((b[1] + b[3]) / 2 / 1000) * shPx,
+        });
+      }
+    } catch {
+      // network/model failure — fall through to weaker signals
+    }
+  }
+
+  // 2) Left of the AI's label-text box.
+  const lb = field.labelBox;
+  if (lb && lb.x1 > lb.x0 && lb.y1 > lb.y0) {
+    const labelHpx = ((lb.y1 - lb.y0) / 100) * h;
+    targets.push({
+      x: ((lb.x0 / 100) * w) - labelHpx * 1.2,
+      y: (((lb.y0 + lb.y1) / 2) / 100) * h,
+    });
+  }
+
+  // 3) The AI's own square estimate.
+  targets.push({
+    x: (((field.box.x0 + field.box.x1) / 2) / 100) * w,
+    y: (((field.box.y0 + field.box.y1) / 2) / 100) * h,
+  });
+
+  for (const t of targets) {
+    const square = findSquareNear(ctx, w, h, t.x, t.y, sizeHint);
+    if (square) {
+      const fontPx = Math.max(6, square.inner * 0.85);
+      return {
+        ...field,
+        value: 'X',
+        x: clampPct(((square.cx - 0.33 * fontPx) / w) * 100),
+        y: clampPct(((square.cy - 0.52 * fontPx) / h) * 100),
+        fontSize: Math.max(0.5, Math.min((fontPx / h) * 100, 2.5)),
+      };
+    }
+  }
+  return field;
+}
+
+/**
+ * Pixel square detector: search a window around a target point for a small
+ * square outline (paired short horizontal runs joined by dark verticals) and
+ * return the one nearest the target, in page pixel coords.
+ */
+function findSquareNear(ctx, w, h, targetX, targetY, sizeHint) {
+  const pad = Math.max(24, sizeHint * 3.2);
+  const probe = {
+    x0: Math.max(0, ((targetX - pad) / w) * 100),
+    y0: Math.max(0, ((targetY - pad) / h) * 100),
+    x1: Math.min(100, ((targetX + pad) / w) * 100),
+    y1: Math.min(100, ((targetY + pad) / h) * 100),
+  };
+  const region = analyzeRegion(ctx, w, h, probe, 0, 0);
+  const { sx0, sy0, rw, rh, isDark } = region;
+  const tX = targetX - sx0;
+  const tY = targetY - sy0;
+
+  // Short horizontal dark runs = candidate square edges.
   const runs = [];
   for (let y = 0; y < rh; y++) {
     let start = -1;
@@ -541,15 +656,11 @@ function refineCheckbox(ctx, w, h, field) {
     }
   }
 
-  // Pair runs into squares: same x-range, square-ish separation, dark
-  // vertical edges connecting them.
-  const aiCx = (region.bx0 + region.bx1) / 2 - sx0;
-  const aiCy = (region.by0 + region.by1) / 2 - sy0;
   let best = null;
   for (const a of runs) {
     for (const b of runs) {
       const height = b.y - a.y;
-      if (height < 7 || height > 45) {
+      if (height < 9 || height > 45) {
         continue;
       }
       if (Math.abs(a.x0 - b.x0) > 3 || Math.abs(a.x1 - b.x1) > 3) {
@@ -559,7 +670,11 @@ function refineCheckbox(ctx, w, h, field) {
       if (width / height < 0.6 || width / height > 1.7) {
         continue;
       }
-      // Verify vertical edges: mostly dark down both sides.
+      // Size plausibility vs the AI's estimate — rejects letter-glyph loops.
+      const side = Math.max(width, height);
+      if (side < sizeHint * 0.4 || side > sizeHint * 2.2) {
+        continue;
+      }
       let leftDark = 0;
       let rightDark = 0;
       for (let y = a.y; y <= b.y; y++) {
@@ -573,26 +688,29 @@ function refineCheckbox(ctx, w, h, field) {
       if (leftDark / (height + 1) < 0.7 || rightDark / (height + 1) < 0.7) {
         continue;
       }
+      // A real checkbox is EMPTY inside; glyph shapes and dense text are not.
+      let inkInside = 0;
+      let nInside = 0;
+      for (let y = a.y + 3; y <= b.y - 3; y++) {
+        for (let x = a.x0 + 3; x <= a.x1 - 3; x++) {
+          if (isDark(x, y)) {
+            inkInside++;
+          }
+          nInside++;
+        }
+      }
+      if (nInside > 0 && inkInside / nInside > 0.08) {
+        continue;
+      }
       const cx = (a.x0 + a.x1) / 2;
       const cy = (a.y + b.y) / 2;
-      const dist = (cx - aiCx) ** 2 + (cy - aiCy) ** 2;
+      const dist = (cx - tX) ** 2 + (cy - tY) ** 2;
       if (!best || dist < best.dist) {
-        best = { cx, cy, inner: Math.min(width, height) - 3, dist };
+        best = { cx: sx0 + cx, cy: sy0 + cy, inner: Math.min(width, height) - 3, dist };
       }
     }
   }
-  if (!best) {
-    return field;
-  }
-
-  const fontPx = Math.max(6, best.inner * 0.85);
-  return {
-    ...field,
-    value: 'X',
-    x: clampPct(((sx0 + best.cx - 0.33 * fontPx) / w) * 100),
-    y: clampPct(((sy0 + best.cy - 0.52 * fontPx) / h) * 100),
-    fontSize: Math.max(0.5, Math.min((fontPx / h) * 100, 2.5)),
-  };
+  return best;
 }
 
 function clampPct(v) {

@@ -10,7 +10,7 @@
  *  - Same-origin static assets (JS/CSS/images/fonts): stale-while-revalidate —
  *    instant from cache, refreshed in the background.
  */
-const VERSION = 'clickfiller-v1';
+const VERSION = 'clickfiller-v2';
 const SHELL = 'index.html';
 
 self.addEventListener('install', (event) => {
@@ -40,9 +40,12 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Navigations: network-first, fall back to the cached app shell offline.
+  // cache:'no-cache' forces revalidation past the browser's HTTP cache —
+  // without it, a heuristically-cached index.html can pin users to an old
+  // build (old asset hashes) for days after a deploy.
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
+      fetch(request, { cache: 'no-cache' })
         .then((res) => {
           const copy = res.clone();
           caches.open(VERSION).then((c) => c.put('/', copy));
