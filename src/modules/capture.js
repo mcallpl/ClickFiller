@@ -10,6 +10,7 @@ import { getProfile, saveProfile } from '../profile.js';
 import { showLoadingOverlay, updateLoadingOverlay, dismissLoadingOverlay } from './ui-utils.js';
 import { optimizeForAPI, getImageDimensions } from '../image-processor.js';
 import { askForMissingFields } from '../components/missing-fields-modal.js';
+import { refinePlacements } from '../placement-refiner.js';
 
 let cameraInput = null;
 let fileInput = null;
@@ -256,10 +257,20 @@ async function handleFillForm() {
     // Final step
     updateLoadingOverlay(loadingOverlay, 'Analyzing form and filling fields...', 'Step 3/3: Positioning text...');
 
+    // Pixel-refine placement against the form's actual printed lines/borders.
+    // The AI box is an estimate; the ink on the page is ground truth. Any
+    // failure here falls back to the AI placement — never blocks filling.
+    let placedFields = fields;
+    try {
+      placedFields = await refinePlacements(imageData, fields);
+    } catch (err) {
+      console.warn('Placement refinement skipped:', err);
+    }
+
     // Emit event for result module to handle
     eventBus.emit('form:analyzing-complete', {
       imageData,
-      fields,
+      fields: placedFields,
     });
   } catch (err) {
     console.error('Fill error:', err);

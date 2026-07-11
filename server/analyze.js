@@ -270,6 +270,11 @@ Accuracy matters more than quantity:
             width: boxW,
             height: boxH,
             fontSize,
+            // Raw detection box (percent coords). The client uses this to
+            // pixel-refine placement against the form's actual printed
+            // lines/borders — the AI box is a good estimate, the ink on the
+            // page is ground truth.
+            box: { x0: xMin, y0: yMin, x1: xMax, y1: yMax },
           };
         });
 
