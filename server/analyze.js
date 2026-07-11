@@ -223,37 +223,49 @@ Accuracy matters more than quantity:
 
           const boxH = Math.max(yMax - yMin, 0);
           const boxW = Math.max(xMax - xMin, 0);
-
-          // Text height: most of the writing area, within sane bounds for a
-          // typical form (too-large boxes happen when the model boxes a whole
-          // multi-line section; cap so text stays label-sized).
-          let fontSize = clamp(boxH * 0.62, 1.1, 3.2);
-
-          // Width-aware shrink: if the value is too long for the writing
-          // area at this size, reduce the font so it fits inside the box
-          // instead of spilling past its right edge. Needs the real image
-          // dimensions (sent by the client) to relate %-width to %-height.
           const value = f.value === undefined || f.value === null ? '' : String(f.value);
           const imgW = parseFloat(dims.imageWidth);
           const imgH = parseFloat(dims.imageHeight);
+          const aspect = imgW > 0 && imgH > 0 ? imgH / imgW : 1.29; // height:width
+
+          // --- Font size -------------------------------------------------
+          // Diagnostic (drawing raw boxes + text on real forms) showed the
+          // model's boxes are tight and accurate; the visible error was all in
+          // this conversion. Target ~52% of the writing-area height — enough to
+          // read clearly, small enough to sit inside the box like real ink
+          // rather than filling it edge to edge.
+          let fontSize = clamp(boxH * 0.52, 1.0, 3.0);
+
+          // Width-aware shrink so long values never spill past the box's right
+          // edge. Reserve a small right margin (0.9 of the box width) matching
+          // the left inset below, and use 0.52em as the average Arial glyph
+          // advance. %-width and %-height differ by the image aspect ratio.
           if (value && boxW > 0 && imgW > 0 && imgH > 0) {
-            // ~0.55em average glyph width for Arial-style fonts
-            const fontFitsWidth = (boxW / 100 * imgW) * 100 / (imgH * 0.55 * value.length);
-            fontSize = clamp(Math.min(fontSize, fontFitsWidth), 0.9, 3.2);
+            const usableWpx = (boxW * 0.9 / 100) * imgW;
+            const fontFitsWidthPct = (usableWpx / (0.52 * value.length)) / imgH * 100;
+            fontSize = clamp(Math.min(fontSize, fontFitsWidthPct), 0.8, 3.0);
           }
 
-          // Bottom-align in the box with a small gap above the line (enough
-          // that descenders don't sit on the border), then clamp into view.
-          // Degenerate/thin boxes fall back to the box top.
-          let y = yMax - fontSize - boxH * 0.15;
+          // --- Vertical position -----------------------------------------
+          // Center the text within the box. This is correct for bordered input
+          // boxes and also right for underline fields (the box's bottom edge is
+          // the line, so a centered glyph floats just above it). textBaseline
+          // 'top' places the em-box top at y; cap-height ink is optically ~0.06em
+          // low within the em, so nudge up a hair for true optical centering.
+          let y = yMin + (boxH - fontSize) / 2 - fontSize * 0.06;
           if (!(y > 0) || boxH === 0) {
             y = yMin;
           }
 
+          // --- Horizontal position ---------------------------------------
+          // Inset ~0.4em from the box's left edge so text doesn't touch the
+          // border. 0.4em is a height measure; convert to a width-% via aspect.
+          const leftInsetPct = Math.min(fontSize * 0.4 * aspect, boxW * 0.5);
+
           return {
             label: f.label || '',
             value,
-            x: clamp(xMin + Math.min(boxW * 0.03, 0.5), 0, 98),
+            x: clamp(xMin + leftInsetPct, 0, 98),
             y: clamp(y, 0, 98),
             width: boxW,
             height: boxH,
