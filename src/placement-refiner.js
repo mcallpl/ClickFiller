@@ -47,19 +47,47 @@ export async function refinePlacements(imageDataUrl, fields, opts = {}) {
 
   const locate = opts.locate || defaultLocate;
   const placed = [];
+  // Rects (page px) already claimed by placed fields. Later fields must not
+  // overlap earlier ones — two fields resolving to the same clear space is
+  // how "business name stamped over the name" happens.
+  const placedRects = [];
+
+  const claim = (f) => {
+    if (!f || typeof f.x !== 'number') {
+      return;
+    }
+    const fontPx = ((f.fontSize || 1.5) / 100) * h;
+    const x0 = (f.x / 100) * w;
+    const y0 = (f.y / 100) * h;
+    placedRects.push({
+      x0: x0 - 2,
+      y0: y0 - 2,
+      x1: x0 + textWidth(String(f.value || ''), fontPx) + 2,
+      y1: y0 + fontPx + 2,
+    });
+  };
+
   for (const field of fields) {
     if (!field || !field.box) {
       placed.push(field);
       continue;
     }
     try {
-      const refined = await refineField(ctx, w, h, field, locate);
-      placed.push(...(Array.isArray(refined) ? refined : [refined]));
+      const refined = await refineField(ctx, w, h, field, locate, placedRects);
+      const list = Array.isArray(refined) ? refined : [refined];
+      list.forEach(claim);
+      placed.push(...list);
     } catch {
+      claim(field);
       placed.push(field);
     }
   }
   return placed;
+}
+
+/** Does a page-px rect overlap any already-placed field? */
+function hitsPlaced(placedRects, x0, y0, x1, y1) {
+  return placedRects.some((r) => x0 < r.x1 && x1 > r.x0 && y0 < r.y1 && y1 > r.y0);
 }
 
 /**
@@ -276,7 +304,7 @@ function textWidth(value, fontPx) {
   return value.length * 0.52 * fontPx;
 }
 
-async function refineField(ctx, w, h, field, locate) {
+async function refineField(ctx, w, h, field, locate, placedRects) {
   const value = String(field.value || '').trim();
   if (!value) {
     return field;
@@ -295,9 +323,11 @@ async function refineField(ctx, w, h, field, locate) {
 
   // Generous window: on many forms (W-9 style) the AI box covers only the
   // printed label line while the real writing space is a taller row below —
-  // the window must reach the row's bottom border to find it.
+  // the window must reach past the row's bottom border AND into the next row
+  // (the band-chain retries there when this row is already claimed by
+  // another field).
   const fontPx0 = (field.fontSize / 100) * h;
-  const padY = Math.max(boxHpx * 2, fontPx0 * 3, 12);
+  const padY = Math.max(boxHpx * 3.5, fontPx0 * 6, 30);
   const region = analyzeRegion(ctx, w, h, field.box, 3, padY);
   const { sx0, sy0, rw, rh } = region;
   const inX0 = Math.max(0, Math.floor(region.bx0 - sx0));
@@ -355,6 +385,38 @@ async function refineField(ctx, w, h, field, locate) {
     return field;
   }
 
+  // If the chosen band is already fully claimed (e.g. the AI anchored two
+  // fields — name and business name — to the same row), the CORRECT home for
+  // this field is usually the next row down. Try the primary band first,
+  // then each band below it.
+  const primaryIndex = bands.indexOf(band);
+  const bandChain = [band, ...bands.slice(primaryIndex + 1)];
+
+  for (const b of bandChain) {
+    const result = placeInBand(region, w, h, field, value, rules, b, inX0, inX1, fontPx0, placedRects);
+    if (result) {
+      return result;
+    }
+  }
+
+  // Nothing clear anywhere; least-bad fallback = bottom of the primary band.
+  const fbFont = Math.min(fontPx0, (band.bottom - band.top) * 0.7);
+  const fallbackY = band.bottom - Math.max(2, fbFont * 0.12) - fbFont;
+  return {
+    ...field,
+    x: clampPct(((sx0 + inX0 + fbFont * 0.35) / w) * 100),
+    y: clampPct(((sy0 + Math.max(band.top, fallbackY)) / h) * 100),
+    fontSize: Math.max(0.7, Math.min((fbFont / h) * 100, 3.0)),
+  };
+}
+
+/**
+ * Try to place a value inside one writing band: comb split, separator split,
+ * then a clear-space hunt that avoids BOTH printed ink and already-placed
+ * fields. Returns the placed field(s) or null if this band has no room.
+ */
+function placeInBand(region, w, h, field, value, rules, band, inX0, inX1, fontPx0, placedRects) {
+  const { sx0, sy0 } = region;
   const bandTop = band.top;
   let bandBottom = band.bottom;
   let leftBound = inX0;
@@ -375,6 +437,13 @@ async function refineField(ctx, w, h, field, locate) {
     return comb;
   }
 
+  // Segmented value over printed separators? (e.g. Date __/__/____ — place
+  // "07" "11" "2026" into the spans between the printed slashes)
+  const split = trySeparatorSplit(region, w, h, field, value, bandTop, bandBottom, inX0, inX1, fontPx0, placedRects);
+  if (split) {
+    return split;
+  }
+
   // Physical left border → indent from it.
   const vr = findVRules(region, inX0, Math.floor(inX0 + (inX1 - inX0) * 0.3), Math.ceil(bandTop), Math.floor(bandBottom));
   if (vr.length > 0) {
@@ -384,9 +453,24 @@ async function refineField(ctx, w, h, field, locate) {
   // ---- Choose a font that fits the band, then hunt for clear space -------
   const bandH = bandBottom - bandTop;
   if (bandH < 6) {
-    return field;
+    return null;
   }
   let fontPx = Math.min(fontPx0, bandH * 0.7);
+
+  // Another field already anchored at this band's left edge? Then this row
+  // is that field's home (the AI gave both fields the same row) and ours is
+  // the next band down — occupying the same row side-by-side reads as two
+  // values in one field. Genuine side-by-side fields (City | State | ZIP)
+  // have different x-windows and are unaffected.
+  const bandPage = {
+    x0: sx0 + leftBound,
+    y0: sy0 + bandTop,
+    x1: sx0 + leftBound + (inX1 - leftBound) * 0.5,
+    y1: sy0 + bandBottom,
+  };
+  if (hitsPlaced(placedRects, bandPage.x0, bandPage.y0, bandPage.x1, bandPage.y1)) {
+    return null;
+  }
 
   for (let attempt = 0; attempt < 2; attempt++) {
     const tw = textWidth(value, fontPx);
@@ -417,11 +501,14 @@ async function refineField(ctx, w, h, field, locate) {
 
     for (const y of ys) {
       for (let x = xBase; x + tw <= rightBound - 2; x += xStep) {
-        if (!collides(region, x - 1, y - 1, x + tw + 1, y + fontPx + 1)) {
+        const pageX = sx0 + x;
+        const pageY = sy0 + y;
+        if (!hitsPlaced(placedRects, pageX, pageY, pageX + tw, pageY + fontPx)
+            && !collides(region, x - 1, y - 1, x + tw + 1, y + fontPx + 1)) {
           return {
             ...field,
-            x: clampPct(((sx0 + x) / w) * 100),
-            y: clampPct(((sy0 + y) / h) * 100),
+            x: clampPct((pageX / w) * 100),
+            y: clampPct((pageY / h) * 100),
             fontSize: Math.max(0.7, Math.min((fontPx / h) * 100, 3.0)),
           };
         }
@@ -432,15 +519,149 @@ async function refineField(ctx, w, h, field, locate) {
     }
     fontPx *= 0.8; // nothing clear at this size — try smaller once
   }
+  return null;
+}
 
-  // No ink-free spot found; least-bad fallback = bottom of the band.
-  const fallbackY = bandBottom - Math.max(2, fontPx * 0.12) - fontPx;
-  return {
-    ...field,
-    x: clampPct(((sx0 + leftBound + fontPx * 0.35) / w) * 100),
-    y: clampPct(((sy0 + Math.max(bandTop, fallbackY)) / h) * 100),
-    fontSize: Math.max(0.7, Math.min((fontPx / h) * 100, 3.0)),
-  };
+/**
+ * Values with separators over printed separator marks: when the value splits
+ * on / or - into 2+ parts AND the band contains exactly that many narrow
+ * printed marks (the form's own "/" glyphs), place each part centered in the
+ * clear span between marks — like a human writing MM / DD / YYYY.
+ */
+function trySeparatorSplit(region, w, h, field, value, bandTop, bandBottom, inX0, inX1, fontPx0, placedRects) {
+  const parts = value.split(/[/-]/).map((s) => s.trim());
+  if (parts.length < 2 || parts.some((p) => !p) || value.length > 24) {
+    return null;
+  }
+
+  const { isDark, sx0, sy0 } = region;
+  const y0 = Math.ceil(bandTop);
+  const y1 = Math.floor(bandBottom);
+  if (y1 - y0 < 5) {
+    return null;
+  }
+
+  // Rows that are rules (a line's anti-aliased edge bleeding into the band)
+  // must not count as ink — one faint full-width row merges every column
+  // into a single cluster and kills separator detection.
+  const ruleRow = new Array(y1 - y0 + 1).fill(false);
+  for (let y = y0; y <= y1; y++) {
+    let dark = 0;
+    let n = 0;
+    let first = -1;
+    let last = -1;
+    for (let x = inX0; x <= inX1; x += 2) {
+      if (isDark(x, y)) {
+        dark++;
+        if (first < 0) {
+          first = x;
+        }
+        last = x;
+      }
+      n++;
+    }
+    const frac = dark / Math.max(n, 1);
+    const span = first >= 0 ? (last - first) / Math.max(inX1 - inX0, 1) : 0;
+    ruleRow[y - y0] = frac >= DOTTED_FRACTION && span >= DOTTED_SPAN;
+  }
+
+  // Column ink profile across the band → clusters of printed marks.
+  const clusters = [];
+  let run = null;
+  for (let x = inX0; x <= inX1; x++) {
+    let dark = 0;
+    for (let y = y0; y <= y1; y++) {
+      if (!ruleRow[y - y0] && isDark(x, y)) {
+        dark++;
+      }
+    }
+    if (dark > 0) {
+      if (!run) {
+        run = { left: x, right: x };
+      } else {
+        run.right = x;
+      }
+    } else if (run && x - run.right > 2) {
+      // Gap wider than the merge distance closes the cluster. (Never advance
+      // run.right on empty columns — that keeps the gap perpetually "small"
+      // and merges everything into one mega cluster.)
+      clusters.push(run);
+      run = null;
+    }
+  }
+  if (run) {
+    clusters.push(run);
+  }
+
+  // Separator marks are NARROW (a "/" is well under an em); anything wider is
+  // label text — its presence is fine, but it can't be a boundary.
+  const seps = clusters.filter((c) => (c.right - c.left) <= fontPx0 * 0.8);
+  if (seps.length !== parts.length - 1) {
+    return null;
+  }
+
+  const fontPx = Math.min(fontPx0, (y1 - y0) * 0.75);
+  const gap = Math.max(2, fontPx * 0.12);
+  const yPx = bandBottom - gap - fontPx;
+  const bounds = [inX0, ...seps.map((s) => (s.left + s.right) / 2), inX1];
+
+  const placedParts = [];
+  for (let i = 0; i < parts.length; i++) {
+    const segLeft = i === 0 ? bounds[0] : seps[i - 1].right + 2;
+    const segRight = i === parts.length - 1 ? bounds[bounds.length - 1] : seps[i].left - 2;
+    // Largest ink-free sub-span inside the segment (skips label words like
+    // the printed "Date" at the left edge).
+    const clear = clearestSpan(region, segLeft, segRight, y0, y1, ruleRow);
+    const tw = textWidth(parts[i], fontPx);
+    if (!clear || (clear.right - clear.left) < tw) {
+      return null; // a part doesn't fit cleanly — don't half-split
+    }
+    const x = clear.left + ((clear.right - clear.left) - tw) / 2;
+    const pageX = sx0 + x;
+    const pageY = sy0 + yPx;
+    if (hitsPlaced(placedRects, pageX, pageY, pageX + tw, pageY + fontPx)) {
+      return null;
+    }
+    placedParts.push({
+      ...field,
+      label: i === 0 ? field.label : `${field.label} (${i + 1})`,
+      value: parts[i],
+      x: clampPct((pageX / w) * 100),
+      y: clampPct((pageY / h) * 100),
+      fontSize: Math.max(0.7, Math.min((fontPx / h) * 100, 3.0)),
+    });
+  }
+  return placedParts;
+}
+
+/** Widest ink-free horizontal span within [x0,x1] over rows y0..y1,
+ *  ignoring rows flagged as rules (line edges bleeding into the band). */
+function clearestSpan(region, x0, x1, y0, y1, ruleRow) {
+  const { isDark } = region;
+  let best = null;
+  let runStart = null;
+  for (let x = Math.max(0, Math.floor(x0)); x <= Math.ceil(x1); x++) {
+    let dark = 0;
+    for (let y = y0; y <= y1; y++) {
+      if (!(ruleRow && ruleRow[y - y0]) && isDark(x, y)) {
+        dark++;
+      }
+    }
+    if (dark === 0) {
+      if (runStart === null) {
+        runStart = x;
+      }
+    } else if (runStart !== null) {
+      if (!best || (x - runStart) > (best.right - best.left)) {
+        best = { left: runStart, right: x - 1 };
+      }
+      runStart = null;
+    }
+  }
+  if (runStart !== null && (!best || (Math.ceil(x1) - runStart) > (best.right - best.left))) {
+    best = { left: runStart, right: Math.ceil(x1) };
+  }
+  return best;
 }
 
 /**
@@ -531,23 +752,29 @@ function tryCombSplit(region, w, h, field, value, bandTop, bandBottom, inX0, inX
  * Checkbox: place an X centered in the correct square.
  *
  * Full-page AI localization of tiny empty squares is unreliable (observed
- * ~30%-of-page misses), so this works through a chain of target points and
- * pixel-verifies each with a dedicated square detector:
- *   1. FOCUSED LOOK — crop just this row of the form and ask the backend to
- *      find "the square left of the printed label"; with the square large
- *      relative to the strip, localization is far more accurate.
- *   2. The AI's label-text box (text localization beats square localization).
+ * ~30%-of-page misses), and even the focused look sometimes boxes the option
+ * TEXT instead of its square. What holds: answers land on or near the right
+ * OPTION, and the square is always on the same row, to the LEFT of the text.
+ * So each signal becomes a row-locked corridor sweep: find real squares
+ * (pixel-verified) in the row and take the nearest one left of the answer.
+ *   1. FOCUSED LOOK — crop this row, ask the backend for the option's square.
+ *   2. The AI's label-text box.
  *   3. The AI's original square estimate.
- * The X is only ever drawn where the pixel detector confirms an actual
- * square outline; otherwise the AI placement stands.
+ * If no square is pixel-confirmed anywhere, fall back to the focused x on
+ * the option's row — at minimum the mark stays on the right line.
  */
 async function refineCheckbox(ctx, w, h, field, locate) {
   const boxHpx = ((field.box.y1 - field.box.y0) / 100) * h;
   const boxWpx = ((field.box.x1 - field.box.x0) / 100) * w;
   const sizeHint = Math.max(8, Math.min(boxHpx, boxWpx, 40));
-  const targets = [];
+  const aiCy = (((field.box.y0 + field.box.y1) / 2) / 100) * h;
+  const aiCx = (((field.box.x0 + field.box.x1) / 2) / 100) * w;
 
-  // 1) Focused strip query (the strongest signal).
+  // Anchors: {x, y} points the square should be left-of / near, best first.
+  const anchors = [];
+  let locateAnswered = null;
+
+  // 1) Focused strip query.
   if (locate && field.label) {
     try {
       const stripTopPct = Math.max(0, field.box.y0 - 2.5);
@@ -561,74 +788,103 @@ async function refineCheckbox(ctx, w, h, field, locate) {
       const res = await locate(strip.toDataURL('image/png'), field.label);
       if (res && res.found && Array.isArray(res.box_2d)) {
         const b = res.box_2d;
-        const aiCy = (((field.box.y0 + field.box.y1) / 2) / 100) * h;
-        // Axis order can't be voted on a single box — try both readings, and
-        // also cross x-from-locate with y-from-the-AI-box (the strip answer's
-        // x tends to be excellent while its y within the strip can be sloppy).
-        targets.push({
-          x: ((b[1] + b[3]) / 2 / 1000) * w,
-          y: syPx + ((b[0] + b[2]) / 2 / 1000) * shPx,
-        });
-        targets.push({ x: ((b[1] + b[3]) / 2 / 1000) * w, y: aiCy });
-        targets.push({
-          x: ((b[0] + b[2]) / 2 / 1000) * w,
-          y: syPx + ((b[1] + b[3]) / 2 / 1000) * shPx,
-        });
+        const lx = ((b[1] + b[3]) / 2 / 1000) * w;
+        const ly = syPx + ((b[0] + b[2]) / 2 / 1000) * shPx;
+        locateAnswered = { x: lx, y: aiCy };
+        anchors.push({ x: lx, y: aiCy });
+        anchors.push({ x: lx, y: ly });
+        // Alternate axis-order reading of the answer box.
+        anchors.push({ x: ((b[0] + b[2]) / 2 / 1000) * w, y: aiCy });
       }
     } catch {
       // network/model failure — fall through to weaker signals
     }
   }
 
-  // 2) Left of the AI's label-text box.
+  // 2) Left edge of the AI's label-text box.
   const lb = field.labelBox;
   if (lb && lb.x1 > lb.x0 && lb.y1 > lb.y0) {
-    const labelHpx = ((lb.y1 - lb.y0) / 100) * h;
-    targets.push({
-      x: ((lb.x0 / 100) * w) - labelHpx * 1.2,
+    anchors.push({
+      x: (lb.x0 / 100) * w,
       y: (((lb.y0 + lb.y1) / 2) / 100) * h,
     });
   }
 
   // 3) The AI's own square estimate.
-  targets.push({
-    x: (((field.box.x0 + field.box.x1) / 2) / 100) * w,
-    y: (((field.box.y0 + field.box.y1) / 2) / 100) * h,
-  });
+  anchors.push({ x: aiCx, y: aiCy });
 
-  for (const t of targets) {
-    const square = findSquareNear(ctx, w, h, t.x, t.y, sizeHint);
-    if (square) {
-      const fontPx = Math.max(6, square.inner * 0.85);
-      return {
-        ...field,
-        value: 'X',
-        x: clampPct(((square.cx - 0.33 * fontPx) / w) * 100),
-        y: clampPct(((square.cy - 0.52 * fontPx) / h) * 100),
-        fontSize: Math.max(0.5, Math.min((fontPx / h) * 100, 2.5)),
-      };
+  for (const soft of [false, true]) {
+    for (const anchor of anchors) {
+      const square = findSquareInRow(ctx, w, h, anchor.x, anchor.y, sizeHint, soft);
+      if (square) {
+        const fontPx = Math.max(6, square.inner * 0.85);
+        return {
+          ...field,
+          value: 'X',
+          x: clampPct(((square.cx - 0.33 * fontPx) / w) * 100),
+          y: clampPct(((square.cy - 0.52 * fontPx) / h) * 100),
+          fontSize: Math.max(0.5, Math.min((fontPx / h) * 100, 2.5)),
+        };
+      }
     }
+  }
+
+  // No pixel-confirmed square. Keep the mark on the option's row at the
+  // focused x if we have one; otherwise leave the AI placement.
+  if (locateAnswered) {
+    const fontPx = Math.max(6, sizeHint * 0.7);
+    return {
+      ...field,
+      value: 'X',
+      x: clampPct(((locateAnswered.x - 0.33 * fontPx) / w) * 100),
+      y: clampPct(((aiCy - 0.52 * fontPx) / h) * 100),
+      fontSize: Math.max(0.5, Math.min((fontPx / h) * 100, 2.5)),
+    };
   }
   return field;
 }
 
 /**
- * Pixel square detector: search a window around a target point for a small
- * square outline (paired short horizontal runs joined by dark verticals) and
- * return the one nearest the target, in page pixel coords.
+ * Row-locked corridor sweep: collect pixel-verified squares in a wide band
+ * left of (and slightly right of) the anchor, on the anchor's row, and pick
+ * the closest one at or left of the anchor. Answers tend to land on the
+ * option text; its square sits left of it on the same line.
  */
-function findSquareNear(ctx, w, h, targetX, targetY, sizeHint) {
-  const pad = Math.max(24, sizeHint * 3.2);
+function findSquareInRow(ctx, w, h, anchorX, anchorY, sizeHint, soft) {
+  const reach = soft ? 5 : 9; // in units of sizeHint, sweeping leftward
   const probe = {
-    x0: Math.max(0, ((targetX - pad) / w) * 100),
-    y0: Math.max(0, ((targetY - pad) / h) * 100),
-    x1: Math.min(100, ((targetX + pad) / w) * 100),
-    y1: Math.min(100, ((targetY + pad) / h) * 100),
+    x0: Math.max(0, ((anchorX - sizeHint * reach) / w) * 100),
+    y0: Math.max(0, ((anchorY - sizeHint * 2.2) / h) * 100),
+    x1: Math.min(100, ((anchorX + sizeHint * 2.5) / w) * 100),
+    y1: Math.min(100, ((anchorY + sizeHint * 2.2) / h) * 100),
   };
+  const squares = collectSquares(ctx, w, h, probe, sizeHint, soft);
+  if (squares.length === 0) {
+    return null;
+  }
+  const ax = anchorX;
+  // Prefer squares at/left of the anchor, nearest first; a square slightly
+  // right of the anchor is acceptable only if nothing sits to the left.
+  const leftOnes = squares.filter((s) => s.cx <= ax + sizeHint * 1.2);
+  const pool = leftOnes.length > 0 ? leftOnes : squares;
+  pool.sort((a, b) => Math.abs(ax - a.cx) - Math.abs(ax - b.cx));
+  return pool[0];
+}
+
+/**
+ * Pixel square detector over a probe region (percent coords): returns every
+ * verified small square outline — paired short horizontal runs joined by
+ * dark verticals, size-plausible, with an EMPTY interior (letter glyphs and
+ * dense text fail these checks).
+ */
+function collectSquares(ctx, w, h, probe, sizeHint, soft) {
+  const minSide = Math.max(soft ? 8 : 9, sizeHint * 0.5);
+  const edgeFrac = soft ? 0.55 : 0.7;
+  const interiorMax = soft ? 0.12 : 0.08;
+  const runGap = soft ? 2 : 1;
+
   const region = analyzeRegion(ctx, w, h, probe, 0, 0);
   const { sx0, sy0, rw, rh, isDark } = region;
-  const tX = targetX - sx0;
-  const tY = targetY - sy0;
 
   // Short horizontal dark runs = candidate square edges.
   const runs = [];
@@ -641,7 +897,7 @@ function findSquareNear(ctx, w, h, targetX, targetY, sizeHint) {
         if (start < 0) {
           start = x;
         }
-        gapAllowance = 1;
+        gapAllowance = runGap;
       } else if (start >= 0) {
         if (gapAllowance > 0 && x < rw) {
           gapAllowance--;
@@ -656,11 +912,11 @@ function findSquareNear(ctx, w, h, targetX, targetY, sizeHint) {
     }
   }
 
-  let best = null;
+  const squares = [];
   for (const a of runs) {
     for (const b of runs) {
       const height = b.y - a.y;
-      if (height < 9 || height > 45) {
+      if (height < minSide || height > 45) {
         continue;
       }
       if (Math.abs(a.x0 - b.x0) > 3 || Math.abs(a.x1 - b.x1) > 3) {
@@ -670,9 +926,8 @@ function findSquareNear(ctx, w, h, targetX, targetY, sizeHint) {
       if (width / height < 0.6 || width / height > 1.7) {
         continue;
       }
-      // Size plausibility vs the AI's estimate — rejects letter-glyph loops.
       const side = Math.max(width, height);
-      if (side < sizeHint * 0.4 || side > sizeHint * 2.2) {
+      if (side < sizeHint * 0.5 || side > sizeHint * 2.2) {
         continue;
       }
       let leftDark = 0;
@@ -685,7 +940,7 @@ function findSquareNear(ctx, w, h, targetX, targetY, sizeHint) {
           rightDark++;
         }
       }
-      if (leftDark / (height + 1) < 0.7 || rightDark / (height + 1) < 0.7) {
+      if (leftDark / (height + 1) < edgeFrac || rightDark / (height + 1) < edgeFrac) {
         continue;
       }
       // A real checkbox is EMPTY inside; glyph shapes and dense text are not.
@@ -699,18 +954,17 @@ function findSquareNear(ctx, w, h, targetX, targetY, sizeHint) {
           nInside++;
         }
       }
-      if (nInside > 0 && inkInside / nInside > 0.08) {
+      if (nInside > 0 && inkInside / nInside > interiorMax) {
         continue;
       }
-      const cx = (a.x0 + a.x1) / 2;
-      const cy = (a.y + b.y) / 2;
-      const dist = (cx - tX) ** 2 + (cy - tY) ** 2;
-      if (!best || dist < best.dist) {
-        best = { cx: sx0 + cx, cy: sy0 + cy, inner: Math.min(width, height) - 3, dist };
-      }
+      squares.push({
+        cx: sx0 + (a.x0 + a.x1) / 2,
+        cy: sy0 + (a.y + b.y) / 2,
+        inner: Math.min(width, height) - 3,
+      });
     }
   }
-  return best;
+  return squares;
 }
 
 function clampPct(v) {
