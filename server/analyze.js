@@ -122,7 +122,8 @@ CRITICAL — what the box must cover:
 - Do NOT include the printed label in the box. If the form says "Name: ________", the box starts immediately AFTER the colon, at the beginning of the blank line, and ends at the end of the line.
 - The box's bottom edge (ymax) sits ON the answer line / underline. The box's top edge (ymin) is one text-line height above it.
 - For an empty rectangle/cell, the box is the interior of that rectangle.
-- For a checkbox that should be checked, the box is the checkbox square itself and the value is "X".
+- For a checkbox that should be checked, the box is EXACTLY the small checkbox square itself (not its label text) and the value is "X".
+- For a segmented/comb field (a row of small boxes, one character per box — e.g. SSN or EIN cells), box the ENTIRE row of cells and put the full value (with any dashes) in "value"; the app splits it into the cells.
 
 Accuracy matters more than quantity:
 - Boxes must be tight and precise — a few pixels of drift is visible to the user.
