@@ -5,15 +5,25 @@
 }
 
 :root {
-  --primary: #2563eb;
-  --primary-dark: #1d4ed8;
-  --bg: #0f172a;
-  --surface: #1e293b;
-  --surface-light: #334155;
-  --text: #f1f5f9;
-  --text-muted: #94a3b8;
+  /* "Ballpoint on paper" identity: ink-navy chrome, ballpoint-blue accent.
+     Names kept from the prior palette so every view inherits the refresh. */
+  --pen: #3b6ef5;          /* ballpoint blue accent */
+  --pen-bright: #7ea2ff;   /* lighter ink for gradients/glow */
+  --primary: #3b6ef5;
+  --primary-dark: #2f5cf0;
+  --bg: #0b1020;           /* near-black ink */
+  --surface: #141b30;
+  --surface-light: #1f2942;
+  --ink-line: #2a3757;     /* hairline borders */
+  --paper: #f4f2ea;        /* warm paper white */
+  --text: #eef2fb;
+  --text-muted: #93a1c4;
   --success: #22c55e;
-  --radius: 12px;
+  --radius: 14px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* Utility "form-label" type: uppercase, tracked — echoes printed form labels */
+  --label-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 }
 
 body {
@@ -24,22 +34,76 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Ambient ink wash behind the app — subtle depth, not decoration for its own
+   sake: it reads as ink bleeding into dark paper. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(120% 60% at 50% -10%, rgba(59, 110, 245, 0.16), transparent 60%),
+    radial-gradient(90% 50% at 100% 0%, rgba(126, 162, 255, 0.08), transparent 55%);
+  pointer-events: none;
+}
+
 #app {
   max-width: 480px;
   margin: 0 auto;
   padding: 0 16px;
 }
 
+/* Visually hidden but still focusable + in the a11y tree (unlike [hidden]).
+   Keeps the file inputs reachable by keyboard/screen reader while the styled
+   <label> is the visible control. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Visible keyboard focus everywhere (WCAG). Labels wrapping the file inputs
+   light up via :focus-within when the hidden input is tab-focused. */
+:focus-visible {
+  outline: 2px solid var(--pen-bright);
+  outline-offset: 2px;
+}
+.btn:focus-within {
+  outline: 2px solid var(--pen-bright);
+  outline-offset: 2px;
+}
+
 /* Header */
 header {
-  padding: 16px 0;
+  padding: calc(16px + var(--safe-top)) 0 14px;
   text-align: center;
 }
 
 header h1 {
-  font-size: 24px;
-  font-weight: 700;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
+}
+
+.wordmark {
+  font-size: 25px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.wordmark-ink {
+  color: var(--pen);
+  /* the underline "ink" beneath the brand — ties the wordmark to the concept */
+  background: linear-gradient(var(--pen), var(--pen));
+  background-size: 100% 2px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  padding-bottom: 1px;
 }
 
 nav {
@@ -50,11 +114,12 @@ nav {
 
 .nav-btn {
   background: var(--surface);
-  border: none;
+  border: 1px solid var(--ink-line);
   color: var(--text-muted);
-  padding: 8px 20px;
-  border-radius: 20px;
+  padding: 8px 22px;
+  border-radius: 999px;
   font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -81,26 +146,38 @@ nav {
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: transform 0.12s ease, background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.btn:active {
+  transform: translateY(1px) scale(0.99);
 }
 
 .btn-primary {
-  background: var(--primary);
+  background: linear-gradient(180deg, var(--pen) 0%, var(--primary-dark) 100%);
   color: white;
+  box-shadow: 0 6px 18px -6px rgba(59, 110, 245, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 .btn-primary:hover {
-  background: var(--primary-dark);
+  box-shadow: 0 10px 24px -6px rgba(59, 110, 245, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 .btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .btn-secondary {
-  background: var(--surface-light);
+  background: var(--surface);
   color: var(--text);
+  border: 1px solid var(--ink-line);
+}
+
+.btn-secondary:hover {
+  background: var(--surface-light);
+  border-color: var(--pen);
 }
 
 .btn-danger {
@@ -119,34 +196,90 @@ nav {
   cursor: not-allowed;
 }
 
-/* Capture Prompt */
+/* Capture hero — the landing screen */
 #capture-prompt {
   text-align: center;
-  padding: 60px 0 40px;
+  padding: 44px 0 40px;
 }
 
-.prompt-icon {
-  font-size: 64px;
-  margin-bottom: 16px;
+.hero-eyebrow {
+  font-family: var(--label-font);
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pen-bright);
+  margin-bottom: 14px;
 }
 
-#capture-prompt h2 {
-  font-size: 22px;
-  margin-bottom: 8px;
+.hero-title {
+  font-size: clamp(34px, 11vw, 46px);
+  line-height: 1.02;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text);
+}
+
+.hero-title-ink {
+  color: var(--pen);
+}
+
+/* Signature element: the pen stroke that draws itself once on load */
+.hero-stroke {
+  width: min(280px, 74%);
+  height: 34px;
+  margin: 10px auto 0;
+  display: block;
+  overflow: visible;
+}
+
+.hero-stroke-line {
+  stroke-dasharray: 340;
+  stroke-dashoffset: 340;
+  animation: ink-write 1.15s cubic-bezier(0.65, 0, 0.35, 1) 0.25s forwards;
+  filter: drop-shadow(0 1px 6px rgba(59, 110, 245, 0.45));
+}
+
+@keyframes ink-write {
+  to { stroke-dashoffset: 0; }
+}
+
+#capture-prompt .subtitle {
+  margin: 22px auto 0;
+  max-width: 340px;
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1.55;
 }
 
 #capture-buttons {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-top: 24px;
+  margin-top: 30px;
 }
 
 .btn-large {
-  padding: 18px 28px;
-  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 17px 24px;
+  font-size: 17px;
   width: 100%;
   text-align: center;
+}
+
+.btn-ico {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.btn-ico svg {
+  width: 100%;
+  height: 100%;
 }
 
 /* Cropper */
@@ -160,7 +293,7 @@ nav {
   z-index: 50;
   display: flex;
   flex-direction: column;
-  padding: 12px;
+  padding: calc(12px + var(--safe-top)) 12px 12px;
 }
 
 .crop-hint {
@@ -184,7 +317,7 @@ nav {
   display: flex;
   gap: 12px;
   justify-content: center;
-  padding: 16px 0;
+  padding: 16px 0 calc(16px + var(--safe-bottom));
   flex-shrink: 0;
 }
 
@@ -990,33 +1123,6 @@ button:disabled {
   }
 }
 
-/* ===== FORM FIELD VALIDATION ===== */
-.field-group input.input-success {
-  border-color: var(--success);
-  background-color: rgba(34, 197, 94, 0.05);
-}
-
-.field-group input.input-error {
-  border-color: #ef4444;
-  background-color: rgba(239, 68, 68, 0.05);
-}
-
-.field-validation-message {
-  font-size: 12px;
-  margin-top: 4px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.field-validation-message.success {
-  color: var(--success);
-}
-
-.field-validation-message.error {
-  color: #ef4444;
-}
-
 /* ===== IMPROVED BUTTON STATES ===== */
 .btn {
   position: relative;
@@ -1047,4 +1153,26 @@ button:disabled {
 /* Utility classes for display management */
 .hidden {
   display: none;
+}
+
+/* Respect users who ask for reduced motion: the ink stroke appears fully
+   drawn instead of animating, and transitions collapse. */
+@media (prefers-reduced-motion: reduce) {
+  .hero-stroke-line {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Bottom action rows clear the home indicator on notched phones */
+#result-controls,
+#preview-controls {
+  padding-bottom: var(--safe-bottom);
 }

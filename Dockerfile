@@ -27,8 +27,10 @@ RUN addgroup -g 1001 -S nodejs && \
 # Copy package files from builder
 COPY --from=builder --chown=nodejs:nodejs /app/package*.json ./
 
-# Install only production dependencies
-RUN npm ci --only=production && \
+# Install only production dependencies (--omit=dev; --only=production is
+# deprecated). express-rate-limit and jspdf are runtime deps and are included;
+# vite and test tooling stay out of the runtime image.
+RUN npm ci --omit=dev && \
     npm cache clean --force
 
 # Copy built application from builder

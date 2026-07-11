@@ -1,12 +1,13 @@
 {
-  "name": "ClickFiller",
-  "short_name": "CLICK",
-  "description": "Smart form filling and data automation",
+  "name": "ClickFiller — Snap a form, watch it fill",
+  "short_name": "ClickFiller",
+  "description": "Snap a photo of any paper form and ClickFiller fills your saved details into the right blanks, ready to download as a PDF.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#FFFFFF",
-  "theme_color": "#000000",
+  "background_color": "#0b1020",
+  "theme_color": "#0b1020",
   "orientation": "portrait-primary",
+  "categories": ["productivity", "utilities"],
   "icons": [
     {
       "src": "/favicon-192.png",
@@ -19,6 +20,12 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "/favicon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "/apple-touch-icon.png",

@@ -20,9 +20,10 @@ export function showToast(message, type = 'success', duration = config.TIMEOUTS.
  * Show an error notification
  * @param {string} message - error message
  * @param {string} title - optional error title
+ * @param {Object} action - optional { label: string, callback: function }
  */
-export function showErrorNotification(message, title = 'Error') {
-  return showErrorComponent(title, message);
+export function showErrorNotification(message, title = 'Error', action = null) {
+  return showErrorComponent(title, message, action);
 }
 
 /**

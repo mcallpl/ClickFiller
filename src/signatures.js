@@ -24,10 +24,14 @@ function saveSignatures(sigs) {
  * Add a signature image. Resizes to max 400px wide to save storage.
  */
 export function addSignature(file) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
+    // Without these error handlers a corrupt/undecodable image never settles
+    // the promise, leaving the caller's "Optimizing..." overlay stuck forever.
+    reader.onerror = () => reject(new Error('Could not read the signature image file.'));
     reader.onload = (ev) => {
       const img = new Image();
+      img.onerror = () => reject(new Error('That signature file is not a valid image.'));
       img.onload = () => {
         // Resize to the configured max signature width
         const maxW = config.SIGNATURE_MAX_WIDTH;

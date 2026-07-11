@@ -6,8 +6,11 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: clickfiller-app
+    # Bind to loopback only. Host nginx terminates TLS and reverse-proxies to
+    # this port; publishing 0.0.0.0:3001 would expose the raw API over
+    # plaintext to the public internet, bypassing nginx entirely.
     ports:
-      - "3001:3001"
+      - "127.0.0.1:3002:3001"
     environment:
       - NODE_ENV=production
       - PORT=3001

@@ -46,13 +46,14 @@ export function initErrorHandling() {
  * @param {Object} data.action - optional { label: string, callback: function }
  */
 function handleError(data) {
-  const { message, title = 'Error', userFacing = false } = data;
+  const { message, title = 'Error', userFacing = false, action = null } = data;
 
   // Log to console always
   console.error('Application error:', message);
 
-  // Show to user if marked as user-facing
+  // Show to user if marked as user-facing. Forward the optional action so the
+  // modal's guiding button (e.g. "Go to Profile") actually renders.
   if (userFacing && message) {
-    showErrorNotification(message, title);
+    showErrorNotification(message, title, action);
   }
 }

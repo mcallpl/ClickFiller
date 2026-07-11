@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import rateLimit from 'express-rate-limit';
 import { analyzeForm } from './analyze.js';
 import { validateAnalyzeRequest } from './middleware/validation.js';
 
@@ -11,10 +12,16 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Behind nginx: trust the first proxy hop so express-rate-limit keys on the
+// real client IP (X-Forwarded-For) rather than nginx's 127.0.0.1.
+app.set('trust proxy', 1);
+
 // Allow large payloads for images
 app.use(express.json({ limit: '20mb' }));
 
-// CORS middleware
+// CORS middleware. No cookies/sessions are used, so credentials stay off and
+// the cleartext-HTTP production origin is intentionally NOT whitelisted (it
+// would let a MITM on the insecure origin ride cross-origin requests).
 app.use(cors({
   origin: [
     'http://localhost:5173',
@@ -22,12 +29,23 @@ app.use(cors({
     'http://127.0.0.1:5173',
     'http://127.0.0.1:3001',
     'https://clickfiller.peoplestar.com',
-    'http://clickfiller.peoplestar.com',
+    'https://clickfiller.com',
+    'https://www.clickfiller.com',
   ],
-  credentials: true,
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type'],
 }));
+
+// Rate limit the analysis endpoint: it is the only route that calls the paid
+// Gemini API and buffers multi-MB images, so an unthrottled loop is a direct
+// cost/DoS vector. 20 requests/min per IP is far above real single-user use.
+const analyzeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please wait a moment and try again.' },
+});
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -54,13 +72,15 @@ app.use((req, res, next) => {
     return next();
   }
 
-  const filePath = req.path === '/'
-    ? path.join(distPath, 'index.html')
-    : path.join(distPath, req.path);
+  // Serve static assets from dist. Use sendFile's `root` option with a
+  // relative path: it rejects any path containing `..` segments, so a crafted
+  // request like `/../../etc/passwd` can't escape distPath. Anything missing
+  // falls back to index.html so the SPA client-side router handles the route.
+  const relPath = req.path === '/' ? 'index.html' : req.path.replace(/^\/+/, '');
 
-  res.sendFile(filePath, (err) => {
-    if (err && err.code === 'ENOENT') {
-      res.sendFile(path.join(distPath, 'index.html'));
+  res.sendFile(relPath, { root: distPath }, (err) => {
+    if (err) {
+      res.sendFile('index.html', { root: distPath });
     }
   });
 });
@@ -75,7 +95,7 @@ app.get('/health', (req, res) => {
 });
 
 // Form analysis endpoint with request validation
-app.post('/api/analyze', validateAnalyzeRequest, async (req, res) => {
+app.post('/api/analyze', analyzeLimiter, validateAnalyzeRequest, async (req, res) => {
   console.log('[POST /api/analyze] Starting form analysis');
 
   try {

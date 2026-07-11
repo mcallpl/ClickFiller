@@ -151,9 +151,14 @@ export function resetCapture() {
   // Clear state
   stateManager.setState('capturedImageData', null);
 
-  // Clear input values
+  // Clear input values. savedInput must be cleared too — otherwise re-selecting
+  // the SAME saved file fires no `change` event (value unchanged) and nothing
+  // happens.
   cameraInput.value = '';
   fileInput.value = '';
+  if (savedInput) {
+    savedInput.value = '';
+  }
 }
 
 /**

@@ -84,8 +84,12 @@ export async function analyzeForm(imageDataUrl, profile, dims = {}) {
 
   // Sanitize profile data before sending to the model.
   // This prevents prompt injection attacks via user-supplied values.
+  // Cap the number of keys (defense against a caller inflating the prompt with
+  // thousands of fields to amplify Gemini cost/latency) before mapping.
+  const MAX_PROFILE_KEYS = 100;
   const profileSummary = Object.entries(profile)
     .filter(([key]) => key !== '_custom')
+    .slice(0, MAX_PROFILE_KEYS)
     .map(([key, value]) => {
       // Remove newlines, tabs, and other control characters that could break out
       const clean = String(value)
@@ -285,9 +289,11 @@ Accuracy matters more than quantity:
     }
 
     if (err && typeof err.status === 'number' && err.status >= 400) {
+      // Log the raw upstream message server-side, but never echo it to the
+      // client — it can carry internal SDK/endpoint detail.
       console.error(`[analyzeForm] API ERROR: ${err.status} - ${err.message}`);
-      const apiError = new Error(`Gemini API error: ${err.message}`);
-      apiError.statusCode = 500;
+      const apiError = new Error('The form-analysis service returned an error. Please try again.');
+      apiError.statusCode = 502;
       throw apiError;
     }
 
